@@ -38,7 +38,17 @@ export function SignInForm() {
     return (
       <form onSubmit={onVerify} className="mt-6 space-y-4">
         <p className="text-sm text-neutral-300">
-          We sent a code to <span className="font-medium">{contact}</span>.
+          {channel === "email" ? (
+            <>
+              We emailed <span className="font-medium">{contact}</span>. Open
+              the link in that email to finish signing in — or, if you received
+              a 6-digit code, paste it below.
+            </>
+          ) : (
+            <>
+              We sent a code to <span className="font-medium">{contact}</span>.
+            </>
+          )}
         </p>
         <label className="block">
           <span className="text-xs uppercase tracking-wide text-neutral-400">

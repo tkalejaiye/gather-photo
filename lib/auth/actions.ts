@@ -23,9 +23,19 @@ export async function requestOtp(
   if (!value) return { ok: false, error: "Enter your email or phone." };
 
   const supabase = createClient();
+  // If the Supabase email template still uses {{ .ConfirmationURL }} (default),
+  // the email is a magic link. Tell Supabase to land it on our callback so we
+  // can exchange the PKCE code for a session.
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const emailRedirectTo = `${appUrl}/auth/callback?next=/dashboard`;
+
   const { error } =
     channel === "email"
-      ? await supabase.auth.signInWithOtp({ email: value })
+      ? await supabase.auth.signInWithOtp({
+          email: value,
+          options: { emailRedirectTo },
+        })
       : await supabase.auth.signInWithOtp({ phone: value });
 
   if (error) return { ok: false, error: error.message };

@@ -80,6 +80,20 @@ create policy "own payments" on payments
     exists (select 1 from events e where e.id = payments.event_id and e.host_id = auth.uid())
   );
 
+-- Privileges -----------------------------------------------------------------
+-- Supabase usually applies these automatically; set explicitly so the schema is
+-- reproducible. RLS (above) still gates row-level access. `anon` is intentionally
+-- granted nothing: guests never query the DB directly (writes go via a server
+-- route using the service role).
+grant usage on schema public to authenticated, service_role;
+
+grant all on all tables in schema public to service_role;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated;
+
 -- NOTE: anonymous guest uploads are NOT handled by client-side RLS.
 -- Guests write via a server route (service role) or a scoped Storage policy
 -- that validates an active, unexpired event slug. See TECH_SPEC.md §9.

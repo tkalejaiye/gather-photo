@@ -32,8 +32,11 @@ function uploadOne(item: UploadItem): Promise<void> {
     const upload = new tus.Upload(item.blob, {
       endpoint: process.env.NEXT_PUBLIC_SUPABASE_TUS_ENDPOINT!,
       retryDelays: RETRY_DELAYS,
+      // Supabase TUS requires a fixed 6MB chunk size; uploads stall otherwise.
+      chunkSize: 6 * 1024 * 1024,
       metadata: {
-        bucket: process.env.SUPABASE_STORAGE_BUCKET ?? "event-media",
+        // Supabase reads `bucketName` + `objectName` (not `bucket`).
+        bucketName: "event-media",
         objectName: item.path,
         eventSlug: item.eventSlug,
         uploaderToken: item.uploaderToken,

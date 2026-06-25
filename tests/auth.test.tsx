@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
 
 const getUser = vi.fn();
 const upsert = vi.fn().mockResolvedValue({ error: null });
-const from = vi.fn(() => ({ upsert }));
+const order = vi.fn().mockResolvedValue({ data: [], error: null });
+const select = vi.fn(() => ({ order }));
+const from = vi.fn((table: string) =>
+  table === "events" ? { select } : { upsert },
+);
 
 vi.mock("@supabase/ssr", () => ({
   createServerClient: () => ({ auth: { getUser }, from }),
@@ -34,6 +39,8 @@ describe("dashboard auth guard", () => {
     getUser.mockReset();
     upsert.mockClear();
     from.mockClear();
+    select.mockClear();
+    order.mockClear();
   });
 
   it("redirects unauthenticated visitors to /sign-in", async () => {
@@ -56,7 +63,7 @@ describe("dashboard auth guard", () => {
     });
     const tree = await DashboardPage();
     expect(tree).toBeTruthy();
-    expect(JSON.stringify(tree)).toContain("host@example.com");
+    expect(renderToStaticMarkup(tree)).toContain("host@example.com");
     expect(from).toHaveBeenCalledWith("profiles");
     expect(upsert).toHaveBeenCalledWith(
       { id: "u-1" },

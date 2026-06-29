@@ -144,6 +144,13 @@ describe("create → open round trip", () => {
     const html = renderToStaticMarkup(tree);
     expect(html).toContain("Tunde &amp; Amaka");
     expect(html).toContain("Share your photos");
+    // FRI-9 shell: name input + camera + multi-select affordances render
+    // server-side so the guest sees them before client JS hydrates.
+    expect(html).toContain("Your name (optional)");
+    expect(html).toContain("Take photo");
+    expect(html).toContain("Choose photos");
+    expect(html).toMatch(/capture="environment"/);
+    expect(html).toMatch(/<input[^>]*\bmultiple\b/);
   });
 
   it("404s on an unknown slug", async () => {

@@ -65,6 +65,8 @@ Sign up (email/phone OTP) → create event (name/date/PIN/tier) → pay (Paystac
 
 Tiny guest bundle, fast on low-end Android/3G · compression on by default · no silent upload failures (clear retry) · installable PWA + offline shell · log upload success rate / time-to-complete / failure-by-network-type (these are the validation metrics) · test matrix includes low-end Android + throttled/lossy network as a first-class gate.
 
+**Bundle budget — `/e/[slug]` First Load JS ≤ 110 kB** (Next 14 `next build` "First Load JS" column, includes the shared framework chunks). Heavy guest-only deps (`browser-image-compression`, `tus-js-client`, `idb`) must be **dynamically imported** inside event handlers or lazy effects so they don't land in the initial chunk. Check `next build` output on every PR that touches `app/e/[slug]/` or shared chunks; a regression past the budget blocks merge.
+
 ## 9. Security & privacy
 
 Private by unguessable slug (+ optional PIN); no listing. Guest writes go through a server route or Storage policy scoped to an active, unexpired event; guests never query the DB. Media reads via short-lived signed URLs; bulk download host-only. RLS on every table. Rate-limit upload/register endpoints. Honor `storage_expires_at` via scheduled cleanup. Host can delete any item.

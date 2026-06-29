@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import { getEventBySlug, isEventOpen } from "@/lib/events/lookup";
 import { hasValidPinCookie } from "@/lib/events/pin";
 import { PinForm } from "./PinForm";
+import { GuestUpload } from "./GuestUpload";
 
 // Guest upload route — the critical path.
-// Keep this bundle TINY (loads on low-end Android over 3G).
+// Keep this bundle TINY (loads on low-end Android over 3G — TECH_SPEC §8).
 // FRI-8: resolve the slug, 404 unknown, gate by PIN when set, honor windows.
+// FRI-9: name + uploader_token in localStorage, camera + multi-select shell.
 // M1: capture/select → compress → single upload.
 // M2: IndexedDB queue + resumable TUS + offline resume + progress UI.
 
@@ -43,12 +45,12 @@ export default async function GuestUploadPage({ params, searchParams }: Props) {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
-      <h1 className="text-2xl font-semibold text-brand">Share your photos</h1>
-      <p className="text-neutral-600">{event.name}</p>
-      <p className="text-sm text-neutral-400">
-        Stub. Capture + offline-first upload land in M1/M2 (TECH_SPEC.md §5).
-      </p>
+    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 px-6 py-10">
+      <header className="space-y-1 text-center">
+        <h1 className="text-2xl font-semibold text-brand">Share your photos</h1>
+        <p className="text-sm text-neutral-400">{event.name}</p>
+      </header>
+      <GuestUpload slug={event.slug} />
     </main>
   );
 }

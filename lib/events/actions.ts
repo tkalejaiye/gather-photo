@@ -103,11 +103,14 @@ export async function verifyEventPin(
     return { ok: false, error: "Wrong PIN." };
   }
 
+  // Path `/` (not `/e/{slug}`) so the cookie also reaches `/api/uploads/*`
+  // — the upload routes enforce PIN gating server-side (TECH_SPEC §9). The
+  // cookie name embeds the slug, so per-event isolation is preserved.
   cookies().set(pinCookieName(slug), pinCookieValue(slug, expected), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: `/e/${slug}`,
+    path: "/",
     maxAge: PIN_COOKIE_MAX_AGE,
   });
   return { ok: true };

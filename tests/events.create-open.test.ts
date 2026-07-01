@@ -193,4 +193,26 @@ describe("create → open round trip", () => {
     const res = await createEvent({ name: "x", pin: "abc" });
     expect(res.ok).toBe(false);
   });
+
+  it("renders an 'event has ended' page when the event is closed", async () => {
+    // Push a closed event directly — mirrors what an expired row would look
+    // like in the DB. Guests should see the ended message, not a 404.
+    events.push({
+      id: "evt-closed",
+      host_id: "host-1",
+      name: "Yesterday's party",
+      slug: "abcdefgh234567",
+      pin: null,
+      event_date: null,
+      status: "expired",
+    });
+    const tree = await GuestUploadPage({
+      params: { slug: "abcdefgh234567" },
+      searchParams: {},
+    });
+    const html = renderToStaticMarkup(tree);
+    expect(html).toContain("Yesterday&#x27;s party");
+    expect(html).toContain("This event has ended");
+    expect(html).not.toContain("Share your photos");
+  });
 });

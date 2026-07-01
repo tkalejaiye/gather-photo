@@ -25,6 +25,14 @@ export default async function EventDetailPage({
     .maybeSingle();
   if (!event) notFound();
 
+  // M1 stand-in for the host gallery (FRI-19). Lets the host verify that a
+  // guest upload landed without opening Supabase Studio.
+  const { count: mediaCount } = await supabase
+    .from("media")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", event.id)
+    .eq("status", "active");
+
   // Fail loud if a prod deploy forgot to set this — a localhost QR on a
   // wedding card is a much worse outcome than a 500.
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -73,6 +81,16 @@ export default async function EventDetailPage({
           </code>
           <CopyLinkButton url={guestUrl} />
         </div>
+      </section>
+
+      <section className="mt-6 rounded border border-neutral-800 p-6">
+        <h2 className="text-sm font-medium text-neutral-200">Photos</h2>
+        <p className="mt-1 text-2xl font-semibold text-neutral-100">
+          {mediaCount ?? 0}
+        </p>
+        <p className="mt-1 text-xs text-neutral-500">
+          Full gallery view lands in M3.
+        </p>
       </section>
 
       <section className="mt-6 rounded border border-neutral-800 p-6">

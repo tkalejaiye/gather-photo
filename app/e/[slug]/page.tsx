@@ -20,9 +20,24 @@ export default async function GuestUploadPage({ params, searchParams }: Props) {
   const event = await getEventBySlug(params.slug);
   if (!event) notFound();
 
-  // Spec §4/§9: status + uploads_close_at + storage_expires_at all gate guest
-  // access independently. Closed events 404 — no hint that the slug exists.
-  if (!isEventOpen(event)) notFound();
+  // Spec §4/§9: status + uploads_close_at + storage_expires_at all gate
+  // guest access independently. Unknown slugs still 404; a *closed* event
+  // renders a clear "this event has ended" page so a guest arriving late
+  // from a printed QR sees why they can't upload rather than a generic
+  // 404. Upload API routes stay at 404 for closed events.
+  if (!isEventOpen(event)) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-3 px-6 text-center">
+        <h1 className="text-2xl font-semibold text-brand">{event.name}</h1>
+        <p className="text-sm text-neutral-400">
+          This event has ended. Uploads are closed.
+        </p>
+        <p className="text-xs text-neutral-500">
+          If you think this is a mistake, ask the host to check the event settings.
+        </p>
+      </main>
+    );
+  }
 
   if (event.has_pin) {
     const ok = await hasValidPinCookie(event.slug);

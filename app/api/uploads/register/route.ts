@@ -121,18 +121,39 @@ export async function POST(req: Request) {
     .single();
 
   if (error) {
-    // 23505 = unique violation on (event_id, content_hash). M1 treats this
-    // as success so the guest UI doesn't show a confusing failure when they
-    // accidentally pick the same photo twice. FRI-15 will return the
-    // pre-existing media row id explicitly.
+    // 23505 = unique violation on (event_id, content_hash). Two cases we
+    // handle here — telling them apart matters for the FRI-13 resumable path.
+    //   (a) SAME-PATH RETRY: the resumable uploader's `register` call landed
+    //       twice because a dropped response after a successful first insert
+    //       forced a retry. `storage_path` matches the row that's already in
+    //       the DB — the object at `path` IS the object the existing row
+    //       references. Removing it here would nuke a successfully-registered
+    //       photo. Return the existing id idempotently instead.
+    //   (b) DIFFERENT-PATH DEDUPE: the FRI-11 direct-upload flow assigns a
+    //       fresh UUID path per attempt, so the guest picking the same photo
+    //       twice ends up with two different `path`s that share a content
+    //       hash. The old row references the earlier path; the newly uploaded
+    //       object at `path` is an orphan and should be removed.
+    // Either way we return the existing mediaId so callers can attribute the
+    // media without an extra round-trip (FRI-15 will lean on this).
     const code = (error as { code?: string }).code;
     if (code === "23505") {
-      // No row will reference the just-uploaded object — remove it so we
-      // don't accumulate orphans whenever a guest re-picks the same photo.
-      // Best-effort: failure here means the object lingers until
-      // `storage_expires_at` cleanup, which is acceptable.
-      await supabase.storage.from(MEDIA_BUCKET).remove([path]).catch(() => {});
-      return NextResponse.json({ mediaId: null, duplicate: true });
+      const { data: existing } = await supabase
+        .from("media")
+        .select("id, storage_path")
+        .eq("event_id", event.id)
+        .eq("content_hash", contentHash)
+        .maybeSingle();
+      const isSamePathRetry = existing?.storage_path === path;
+      if (!isSamePathRetry) {
+        // Best-effort: failure to remove means the orphan lingers until
+        // `storage_expires_at` cleanup, which is acceptable.
+        await supabase.storage.from(MEDIA_BUCKET).remove([path]).catch(() => {});
+      }
+      return NextResponse.json({
+        mediaId: existing?.id ?? null,
+        duplicate: true,
+      });
     }
     return NextResponse.json(
       { error: "Could not register upload." },

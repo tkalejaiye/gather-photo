@@ -395,6 +395,86 @@ describe("drainQueue — resume across a mid-upload network drop (THE FRI-13 acc
   });
 });
 
+describe("drainQueue — register is idempotent under lost-response retries", () => {
+  it("recovers cleanly when the FIRST register succeeded server-side but the response was lost", async () => {
+    // Real scenario on a congested venue Wi-Fi: TUS finishes streaming, the
+    // server inserts the media row, then the response TCP connection dies
+    // before the client sees the 200. The client treats it as a network
+    // error and marks the item failed. On the next drain the uploader
+    // re-registers with the SAME storage path (from the queue row). The
+    // fixed register route recognizes a same-path retry, returns the
+    // existing mediaId, and does NOT delete the storage object.
+    const store = makeStore();
+    const server = new FakeTusServer();
+    const hooks: FakeTusHooks = { dropped: new Set() };
+    const tus = makeFakeTus(server, hooks);
+
+    // Stateful register mock modelling the (event_id, content_hash) unique
+    // index. First call inserts; subsequent same-path calls come back with
+    // `duplicate: true` and the existing mediaId — matches the real endpoint
+    // after the FRI-13 fix.
+    const registered = new Map<
+      string,
+      { mediaId: string; storagePath: string }
+    >();
+    let lostFirstResponse = true;
+    const fetchMock: UploaderDeps["fetch"] = vi.fn(async (_url, init) => {
+      const body = JSON.parse(init?.body as string) as {
+        slug: string;
+        path: string;
+        contentHash: string;
+      };
+      const key = `${body.slug}:${body.contentHash}`;
+      const existing = registered.get(key);
+      if (existing) {
+        // Same-path retry — the real endpoint would return the row id
+        // without touching storage.
+        return jsonResponse({
+          mediaId: existing.mediaId,
+          duplicate: true,
+        });
+      }
+      registered.set(key, { mediaId: `m-${registered.size + 1}`, storagePath: body.path });
+      if (lostFirstResponse) {
+        lostFirstResponse = false;
+        // First call inserted server-side but the client never gets to see it.
+        throw new TypeError("fetch failed");
+      }
+      return jsonResponse({ mediaId: `m-${registered.size}`, duplicate: false });
+    });
+
+    const item = await enqueue(makeInput(), queueDeps(store));
+
+    // First drain: TUS uploads all bytes, register inserts, response lost.
+    await drainQueue(makeDeps(store, tus, fetchMock));
+    const afterFirst = await get(item.id, queueDeps(store));
+    expect(afterFirst?.status).toBe("failed");
+    expect(afterFirst?.lastError).toBe("fetch failed");
+    // Server DID insert the row on the first call — that's the whole trap.
+    expect(registered.size).toBe(1);
+    const savedUrl = afterFirst?.tusUploadUrl;
+    expect(savedUrl).toMatch(/^https:\/\/fake-tus\.local\/upload\//);
+    const bytesAfterFirst = server.totalBytesReceived.get(savedUrl!) ?? 0;
+    expect(bytesAfterFirst).toBe(8_000);
+
+    // Second drain: auto-promotes failed→queued, TUS resumes (0 additional
+    // bytes because upload was complete), register fires again and now sees
+    // the same-path duplicate.
+    await drainQueue(makeDeps(store, tus, fetchMock));
+
+    const final = await get(item.id, queueDeps(store));
+    expect(final?.status).toBe("done");
+    expect(final?.blob).toBeNull();
+    // Still exactly ONE row inserted — no double-registration, no phantom row.
+    expect(registered.size).toBe(1);
+    // The storage object was never re-transferred beyond the file size.
+    expect(server.totalBytesReceived.get(savedUrl!)).toBe(8_000);
+    // register was called twice (once per drain) — both calls surfaced,
+    // neither was silent, and the outcome is a clean `done`.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("drainQueue — no silent failures", () => {
   it("marks the item failed with the error message when tus exhausts retries", async () => {
     const store = makeStore();

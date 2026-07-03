@@ -173,11 +173,18 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 
 import { POST as registerPOST } from "@/app/api/uploads/register/route";
 import { POST as signPOST } from "@/app/api/uploads/sign/route";
+import { __resetRateLimitForTests } from "@/lib/upload/rate-limit";
 
-function reqWith(body: unknown): Request {
+// Every rate-limit test injects an `x-forwarded-for` so the limiter keys off
+// a predictable IP instead of the `unknown` fallback (which would collapse
+// all cases into one bucket and break isolation between tests).
+function reqWith(
+  body: unknown,
+  headers: Record<string, string> = {},
+): Request {
   return new Request("http://localhost/api/uploads/register", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
 }
@@ -201,6 +208,7 @@ describe("/api/uploads/register", () => {
     removed.length = 0;
     cookieStore.clear();
     storageHasObject = true;
+    __resetRateLimitForTests();
     events.push(
       {
         id: "evt-active",
@@ -378,6 +386,86 @@ describe("/api/uploads/register", () => {
     // First row survives untouched.
     expect(mediaRows).toHaveLength(1);
     expect(mediaRows[0].storage_path).toBe("events/evt-active/aaa.jpg");
+  });
+
+  // Rate-limit acceptance for FRI-15 / TECH_SPEC §9. The register route inserts
+  // rows and issues signed URLs against storage; without a limiter a hostile
+  // client could inflate the media table and storage costs on a live event.
+  // These tests re-pick a different `path` per request (with a matching
+  // `contentHash`) so we stay on the dedupe branch — the insert side is not
+  // what's under test here, the request-counting is.
+  describe("rate limiting", () => {
+    // A fresh content_hash per request keeps the storage-object check happy
+    // (fakeStorage responds ok for any path) and avoids hitting the 23505
+    // dedupe branch, which is exercised by the tests above.
+    const rlBody = (i: number, overrides: { token?: string } = {}) => ({
+      slug: "active-event-1",
+      path: `events/evt-active/rl-${i.toString().padStart(3, "0")}.jpg`,
+      bytes: 1024,
+      width: 100,
+      height: 100,
+      contentHash: `hash-${i}`,
+      uploaderToken: overrides.token ?? "guest-token",
+      uploaderName: null,
+    });
+
+    it("allows 60 requests within the window and 429s the 61st", async () => {
+      for (let i = 0; i < 60; i += 1) {
+        const res = await registerPOST(
+          reqWith(rlBody(i), { "x-forwarded-for": "10.0.0.1" }),
+        );
+        expect(res.status).toBe(200);
+      }
+      const overflow = await registerPOST(
+        reqWith(rlBody(60), { "x-forwarded-for": "10.0.0.1" }),
+      );
+      expect(overflow.status).toBe(429);
+      const retryAfter = overflow.headers.get("Retry-After");
+      expect(retryAfter).not.toBeNull();
+      expect(Number(retryAfter)).toBeGreaterThan(0);
+      // The overflowed request must not have inserted a media row.
+      expect(mediaRows).toHaveLength(60);
+    });
+
+    it("keys the limiter on (ip + uploaderToken) so a second guest is not punished", async () => {
+      for (let i = 0; i < 60; i += 1) {
+        const res = await registerPOST(
+          reqWith(rlBody(i, { token: "guest-A" }), { "x-forwarded-for": "10.0.0.1" }),
+        );
+        expect(res.status).toBe(200);
+      }
+      // Same IP, different uploaderToken — the venue-NAT case. Must not 429.
+      const other = await registerPOST(
+        reqWith(rlBody(999, { token: "guest-B" }), { "x-forwarded-for": "10.0.0.1" }),
+      );
+      expect(other.status).toBe(200);
+    });
+
+    it("resets the bucket once the window elapses", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-07-03T12:00:00.000Z"));
+        for (let i = 0; i < 60; i += 1) {
+          const res = await registerPOST(
+            reqWith(rlBody(i), { "x-forwarded-for": "10.0.0.1" }),
+          );
+          expect(res.status).toBe(200);
+        }
+        const overflow = await registerPOST(
+          reqWith(rlBody(60), { "x-forwarded-for": "10.0.0.1" }),
+        );
+        expect(overflow.status).toBe(429);
+
+        // Advance past the 60s window — the counter should reset.
+        vi.setSystemTime(new Date("2026-07-03T12:01:01.000Z"));
+        const afterReset = await registerPOST(
+          reqWith(rlBody(61), { "x-forwarded-for": "10.0.0.1" }),
+        );
+        expect(afterReset.status).toBe(200);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
 

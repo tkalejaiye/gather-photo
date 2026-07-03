@@ -78,6 +78,16 @@ function makeShim(store: Map<string, UploadItem>): QueueDB {
       }
       return claimed;
     },
+    async patch(id, transform) {
+      // Same shape as `claim`: never yields internally, so two concurrent
+      // patchers on the same id serialize in JS-turn order — matching the
+      // IDB single-transaction semantics.
+      const existing = store.get(id);
+      if (!existing) return undefined;
+      const next = transform({ ...existing });
+      store.set(id, { ...next });
+      return next;
+    },
   };
 }
 

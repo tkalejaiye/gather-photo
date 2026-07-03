@@ -37,6 +37,14 @@ export interface UploadItem {
   progress: number;
   attempts: number;
   lastError?: string;
+  /**
+   * TUS upload location URL returned by the server on the create request.
+   * Persisted so a full page reload can resume the upload from the last
+   * committed byte instead of starting over (TECH_SPEC §5 — the whole
+   * point of resumable uploads on a saturated venue network). Set by the
+   * uploader as soon as tus-js-client hands us a URL.
+   */
+  tusUploadUrl?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -61,6 +69,17 @@ export interface QueueDB {
    * Returns the transitioned items (already in the target status).
    */
   claim(cap: number, stamp: (item: UploadItem) => UploadItem): Promise<UploadItem[]>;
+  /**
+   * Atomically read-modify-write a single row. The IDB backend runs get+put
+   * inside a single `readwrite` transaction so concurrent patchers (e.g. the
+   * uploader firing `setProgress` and `setTusUploadUrl` almost simultaneously
+   * for the same item) can't clobber each other's writes.
+   * Returns the new row, or undefined if the id doesn't exist.
+   */
+  patch(
+    id: string,
+    transform: (existing: UploadItem) => UploadItem,
+  ): Promise<UploadItem | undefined>;
 }
 
 export interface QueueDeps {
@@ -138,6 +157,21 @@ async function defaultOpen(): Promise<QueueDB> {
         await tx.done;
         return claimed;
       },
+      async patch(id, transform) {
+        // Single readwrite transaction so a concurrent patch on the same row
+        // (e.g. onProgress + onUploadUrlAvailable in the uploader) can't
+        // interleave get and put and clobber each other's fields.
+        const tx = db.transaction(STORE, "readwrite");
+        const existing = (await tx.store.get(id)) as UploadItem | undefined;
+        if (!existing) {
+          await tx.done;
+          return undefined;
+        }
+        const next = transform(existing);
+        await tx.store.put(next);
+        await tx.done;
+        return next;
+      },
     };
   })();
   return cachedDb;
@@ -205,6 +239,22 @@ export async function setProgress(
   overrides: Partial<QueueDeps> = {},
 ): Promise<void> {
   await mutate(id, overrides, (existing) => ({ ...existing, progress }));
+}
+
+/**
+ * Persist the TUS upload URL for this item. Called by the uploader as soon as
+ * tus-js-client hands us a Location on the create-request response — the next
+ * drain (after a reconnect or a full page reload) will pass this URL back to
+ * tus-js-client so it resumes from the last committed byte instead of
+ * starting the transfer over from zero (TECH_SPEC §5). Once done, freeing the
+ * URL is optional — the row's blob is nulled by `markDone` anyway.
+ */
+export async function setTusUploadUrl(
+  id: string,
+  url: string,
+  overrides: Partial<QueueDeps> = {},
+): Promise<void> {
+  await mutate(id, overrides, (existing) => ({ ...existing, tusUploadUrl: url }));
 }
 
 /**
@@ -289,11 +339,10 @@ async function mutate(
 ): Promise<UploadItem | undefined> {
   const { open, now } = { ...defaultDeps, ...overrides };
   const db = await open();
-  const existing = await db.get(id);
-  if (!existing) return undefined;
-  const next = { ...transform(existing), updatedAt: now() };
-  await db.put(next);
-  return next;
+  // Delegate to the atomic per-row patch primitive — critical when the
+  // uploader fires progress + URL updates back-to-back on the same row
+  // and the two would otherwise interleave get/put and clobber each other.
+  return db.patch(id, (existing) => ({ ...transform(existing), updatedAt: now() }));
 }
 
 /** Test hook: drops the module-level connection cache. */

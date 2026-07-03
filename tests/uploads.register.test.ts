@@ -17,6 +17,24 @@ type EventRow = {
 
 const events: EventRow[] = [];
 const inserted: Record<string, unknown>[] = [];
+/**
+ * In-memory `media` rows. Modelled well enough to enforce the (event_id,
+ * content_hash) unique index and to serve the follow-up `select+eq+eq+
+ * maybeSingle` lookup the register route does on 23505.
+ */
+type MediaRow = {
+  id: string;
+  event_id: string;
+  content_hash: string;
+  storage_path: string;
+  uploader_token: string;
+  uploader_name: string | null;
+  kind: string;
+  bytes: number;
+  width: number | null;
+  height: number | null;
+};
+const mediaRows: MediaRow[] = [];
 const removed: string[] = [];
 const cookieStore = new Map<string, string>();
 let storageHasObject = true;
@@ -54,12 +72,59 @@ function eventsTable() {
 function mediaTable() {
   return {
     insert(row: Record<string, unknown>) {
+      // Enforce the media_event_hash_uniq unique index — same key → 23505.
+      const eventId = row.event_id as string;
+      const hash = row.content_hash as string;
+      const clash = mediaRows.find(
+        (r) => r.event_id === eventId && r.content_hash === hash,
+      );
+      if (clash) {
+        return {
+          select: () => ({
+            single: async () => ({
+              data: null,
+              error: { code: "23505", message: "unique_violation" },
+            }),
+          }),
+        };
+      }
+      const id = `media-${mediaRows.length + 1}`;
+      mediaRows.push({
+        id,
+        event_id: eventId,
+        content_hash: hash,
+        storage_path: row.storage_path as string,
+        uploader_token: row.uploader_token as string,
+        uploader_name: (row.uploader_name as string | null) ?? null,
+        kind: row.kind as string,
+        bytes: row.bytes as number,
+        width: (row.width as number | null) ?? null,
+        height: (row.height as number | null) ?? null,
+      });
       inserted.push(row);
       return {
         select: () => ({
-          single: async () => ({ data: { id: `media-${inserted.length}` }, error: null }),
+          single: async () => ({ data: { id }, error: null }),
         }),
       };
+    },
+    select(_cols: string) {
+      const filters: Partial<Record<keyof MediaRow, string>> = {};
+      const api = {
+        eq(col: keyof MediaRow, val: string) {
+          filters[col] = val;
+          return api;
+        },
+        async maybeSingle() {
+          const row = mediaRows.find((r) =>
+            Object.entries(filters).every(
+              ([k, v]) => r[k as keyof MediaRow] === v,
+            ),
+          );
+          return { data: row ?? null, error: null };
+        },
+      };
+      return api;
     },
   };
 }
@@ -132,6 +197,7 @@ describe("/api/uploads/register", () => {
   beforeEach(() => {
     events.length = 0;
     inserted.length = 0;
+    mediaRows.length = 0;
     removed.length = 0;
     cookieStore.clear();
     storageHasObject = true;
@@ -256,6 +322,62 @@ describe("/api/uploads/register", () => {
     );
     expect(res.status).toBe(200);
     expect(inserted).toHaveLength(1);
+  });
+
+  // 23505 idempotency — the FRI-13 resumable path fires `register` twice when
+  // the first response is eaten by a dropped connection AFTER the row was
+  // inserted. The queue row pins one storage path across retries, so the
+  // second register targets the SAME path — removing the object here would
+  // break the row inserted by the first call.
+  it("is idempotent on a same-path retry: returns existing mediaId, does not remove the object", async () => {
+    const body = baseBody();
+    const first = await registerPOST(reqWith(body));
+    expect(first.status).toBe(200);
+    const firstJson = (await first.json()) as { mediaId: string; duplicate: boolean };
+    expect(firstJson.duplicate).toBe(false);
+    expect(mediaRows).toHaveLength(1);
+
+    // Retry with the identical body — models the second drain after the
+    // uploader marked the item failed on a lost response.
+    const second = await registerPOST(reqWith(body));
+    expect(second.status).toBe(200);
+    const secondJson = (await second.json()) as { mediaId: string; duplicate: boolean };
+    expect(secondJson.duplicate).toBe(true);
+    // Same id as the first call — callers can attribute the media without
+    // knowing whether it was fresh or a retry.
+    expect(secondJson.mediaId).toBe(firstJson.mediaId);
+    // Critical: the storage object must NOT be removed on a same-path retry.
+    // Otherwise the row inserted by the first call points at a dead object.
+    expect(removed).toEqual([]);
+    // The insert() call was attempted a second time but the unique index
+    // rejected it — one row survives.
+    expect(mediaRows).toHaveLength(1);
+  });
+
+  it("orphans the object on a different-path collision (same guest re-picks a photo)", async () => {
+    // First insert: fresh path A.
+    const first = await registerPOST(
+      reqWith(baseBody({ path: "events/evt-active/aaa.jpg" })),
+    );
+    expect(first.status).toBe(200);
+    const firstJson = (await first.json()) as { mediaId: string };
+
+    // Second insert: same content_hash, DIFFERENT path (FRI-11 direct-upload
+    // assigns a fresh UUID per attempt). The existing row still points at
+    // path A, so path B is a freshly-uploaded orphan that should be removed.
+    const second = await registerPOST(
+      reqWith(baseBody({ path: "events/evt-active/bbb.jpg" })),
+    );
+    expect(second.status).toBe(200);
+    const secondJson = (await second.json()) as { mediaId: string; duplicate: boolean };
+    expect(secondJson.duplicate).toBe(true);
+    // Still returns the existing mediaId (matches the same-path retry).
+    expect(secondJson.mediaId).toBe(firstJson.mediaId);
+    // The orphan at path B was cleaned up.
+    expect(removed).toEqual(["events/evt-active/bbb.jpg"]);
+    // First row survives untouched.
+    expect(mediaRows).toHaveLength(1);
+    expect(mediaRows[0].storage_path).toBe("events/evt-active/aaa.jpg");
   });
 });
 

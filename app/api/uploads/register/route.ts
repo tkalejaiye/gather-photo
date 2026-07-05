@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createStorageClient, MEDIA_BUCKET, resolveOpenEvent } from "@/lib/upload/server";
+import { checkRateLimit } from "@/lib/upload/rate-limit";
 
 // POST /api/uploads/register
 // Body: {
@@ -12,14 +13,22 @@ import { createStorageClient, MEDIA_BUCKET, resolveOpenEvent } from "@/lib/uploa
 // `media` row so the host gallery can see the photo. Re-validates that the
 // event is still active+unexpired — the sign step might be minutes old.
 //
-// Designed for FRI-15 (M2 dedupe): the `(event_id, content_hash)` unique
-// index already exists. Today we collapse the 23505 conflict path into a
-// "duplicate=true" success so FRI-15 can layer richer behaviour (returning
-// the existing row, skipping the storage upload) without rewriting callers.
-//
-// TODO(spec §9): add rate limiting (per IP + per uploader_token) before a
-// real event — the route inserts rows and triggers storage I/O.
+// Dedupe (FRI-15): the `(event_id, content_hash)` unique index in
+// supabase/migrations/0001_init.sql collapses re-registers to a single row;
+// the 23505 branch below returns the existing mediaId with `duplicate: true`
+// so the resumable uploader (`lib/upload/uploader.ts`) can attribute the
+// media on a retry without an extra round-trip.
 export const runtime = "nodejs";
+
+// Rate limit (FRI-15 / TECH_SPEC §9): the register route inserts rows and
+// triggers storage I/O — a hostile client could otherwise inflate storage
+// costs and the media table. 60 requests / minute per (IP, uploaderToken) is
+// well above the ~30-photo burst a real guest generates on the queue drain
+// (`lib/upload/uploader.ts:147`) but bounds a floodgate. IP alone would 429
+// two legitimate guests behind the same venue NAT; token alone is client-
+// controlled — the composite is what the TODO originally called for.
+const RATE_LIMIT_MAX = 60;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 // Path component allowlist — `events/{eventId}/{uuid}.{ext}`. Rejecting
 // anything outside this shape closes off path traversal attempts on top of
@@ -47,6 +56,22 @@ function asPositiveInt(v: unknown): number | null {
   return Math.floor(v);
 }
 
+// Prefer the first `x-forwarded-for` hop when the app runs behind Vercel /
+// Cloudflare (the proxies append the real client IP to the left). Fall back
+// to `x-real-ip` (common with plain nginx), then to a fixed sentinel so an
+// unproxied local request still shares a rate-limit bucket instead of every
+// call getting its own `unknown` key.
+function getClientIp(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const real = req.headers.get("x-real-ip");
+  if (real) return real.trim();
+  return "unknown";
+}
+
 export async function POST(req: Request) {
   let body: Body;
   try {
@@ -72,6 +97,24 @@ export async function POST(req: Request) {
   }
   if (bytes > MAX_BYTES) {
     return NextResponse.json({ error: "File too large." }, { status: 413 });
+  }
+
+  // Rate limit check is deliberately AFTER body validation so a malformed
+  // body still 400s (no need to count it) but BEFORE the DB/Storage calls
+  // that make this route expensive. `|` separator (not `:`) because an IPv6
+  // XFF value already contains colons and would ambiguate the key.
+  const rl = checkRateLimit(`${getClientIp(req)}|${uploaderToken}`, {
+    limit: RATE_LIMIT_MAX,
+    windowMs: RATE_LIMIT_WINDOW_MS,
+  });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many requests." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rl.retryAfterSeconds) },
+      },
+    );
   }
 
   const resolved = await resolveOpenEvent(slug);
@@ -121,18 +164,39 @@ export async function POST(req: Request) {
     .single();
 
   if (error) {
-    // 23505 = unique violation on (event_id, content_hash). M1 treats this
-    // as success so the guest UI doesn't show a confusing failure when they
-    // accidentally pick the same photo twice. FRI-15 will return the
-    // pre-existing media row id explicitly.
+    // 23505 = unique violation on (event_id, content_hash). Two cases we
+    // handle here — telling them apart matters for the FRI-13 resumable path.
+    //   (a) SAME-PATH RETRY: the resumable uploader's `register` call landed
+    //       twice because a dropped response after a successful first insert
+    //       forced a retry. `storage_path` matches the row that's already in
+    //       the DB — the object at `path` IS the object the existing row
+    //       references. Removing it here would nuke a successfully-registered
+    //       photo. Return the existing id idempotently instead.
+    //   (b) DIFFERENT-PATH DEDUPE: the FRI-11 direct-upload flow assigns a
+    //       fresh UUID path per attempt, so the guest picking the same photo
+    //       twice ends up with two different `path`s that share a content
+    //       hash. The old row references the earlier path; the newly uploaded
+    //       object at `path` is an orphan and should be removed.
+    // Either way we return the existing mediaId so callers can attribute the
+    // media without an extra round-trip.
     const code = (error as { code?: string }).code;
     if (code === "23505") {
-      // No row will reference the just-uploaded object — remove it so we
-      // don't accumulate orphans whenever a guest re-picks the same photo.
-      // Best-effort: failure here means the object lingers until
-      // `storage_expires_at` cleanup, which is acceptable.
-      await supabase.storage.from(MEDIA_BUCKET).remove([path]).catch(() => {});
-      return NextResponse.json({ mediaId: null, duplicate: true });
+      const { data: existing } = await supabase
+        .from("media")
+        .select("id, storage_path")
+        .eq("event_id", event.id)
+        .eq("content_hash", contentHash)
+        .maybeSingle();
+      const isSamePathRetry = existing?.storage_path === path;
+      if (!isSamePathRetry) {
+        // Best-effort: failure to remove means the orphan lingers until
+        // `storage_expires_at` cleanup, which is acceptable.
+        await supabase.storage.from(MEDIA_BUCKET).remove([path]).catch(() => {});
+      }
+      return NextResponse.json({
+        mediaId: existing?.id ?? null,
+        duplicate: true,
+      });
     }
     return NextResponse.json(
       { error: "Could not register upload." },

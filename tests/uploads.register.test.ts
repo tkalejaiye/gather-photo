@@ -17,6 +17,24 @@ type EventRow = {
 
 const events: EventRow[] = [];
 const inserted: Record<string, unknown>[] = [];
+/**
+ * In-memory `media` rows. Modelled well enough to enforce the (event_id,
+ * content_hash) unique index and to serve the follow-up `select+eq+eq+
+ * maybeSingle` lookup the register route does on 23505.
+ */
+type MediaRow = {
+  id: string;
+  event_id: string;
+  content_hash: string;
+  storage_path: string;
+  uploader_token: string;
+  uploader_name: string | null;
+  kind: string;
+  bytes: number;
+  width: number | null;
+  height: number | null;
+};
+const mediaRows: MediaRow[] = [];
 const removed: string[] = [];
 const cookieStore = new Map<string, string>();
 let storageHasObject = true;
@@ -54,12 +72,59 @@ function eventsTable() {
 function mediaTable() {
   return {
     insert(row: Record<string, unknown>) {
+      // Enforce the media_event_hash_uniq unique index — same key → 23505.
+      const eventId = row.event_id as string;
+      const hash = row.content_hash as string;
+      const clash = mediaRows.find(
+        (r) => r.event_id === eventId && r.content_hash === hash,
+      );
+      if (clash) {
+        return {
+          select: () => ({
+            single: async () => ({
+              data: null,
+              error: { code: "23505", message: "unique_violation" },
+            }),
+          }),
+        };
+      }
+      const id = `media-${mediaRows.length + 1}`;
+      mediaRows.push({
+        id,
+        event_id: eventId,
+        content_hash: hash,
+        storage_path: row.storage_path as string,
+        uploader_token: row.uploader_token as string,
+        uploader_name: (row.uploader_name as string | null) ?? null,
+        kind: row.kind as string,
+        bytes: row.bytes as number,
+        width: (row.width as number | null) ?? null,
+        height: (row.height as number | null) ?? null,
+      });
       inserted.push(row);
       return {
         select: () => ({
-          single: async () => ({ data: { id: `media-${inserted.length}` }, error: null }),
+          single: async () => ({ data: { id }, error: null }),
         }),
       };
+    },
+    select(_cols: string) {
+      const filters: Partial<Record<keyof MediaRow, string>> = {};
+      const api = {
+        eq(col: keyof MediaRow, val: string) {
+          filters[col] = val;
+          return api;
+        },
+        async maybeSingle() {
+          const row = mediaRows.find((r) =>
+            Object.entries(filters).every(
+              ([k, v]) => r[k as keyof MediaRow] === v,
+            ),
+          );
+          return { data: row ?? null, error: null };
+        },
+      };
+      return api;
     },
   };
 }
@@ -107,12 +172,18 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "http://localhost:54321";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 
 import { POST as registerPOST } from "@/app/api/uploads/register/route";
-import { POST as signPOST } from "@/app/api/uploads/sign/route";
+import { __resetRateLimitForTests } from "@/lib/upload/rate-limit";
 
-function reqWith(body: unknown): Request {
+// Every rate-limit test injects an `x-forwarded-for` so the limiter keys off
+// a predictable IP instead of the `unknown` fallback (which would collapse
+// all cases into one bucket and break isolation between tests).
+function reqWith(
+  body: unknown,
+  headers: Record<string, string> = {},
+): Request {
   return new Request("http://localhost/api/uploads/register", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
 }
@@ -132,9 +203,11 @@ describe("/api/uploads/register", () => {
   beforeEach(() => {
     events.length = 0;
     inserted.length = 0;
+    mediaRows.length = 0;
     removed.length = 0;
     cookieStore.clear();
     storageHasObject = true;
+    __resetRateLimitForTests();
     events.push(
       {
         id: "evt-active",
@@ -257,82 +330,145 @@ describe("/api/uploads/register", () => {
     expect(res.status).toBe(200);
     expect(inserted).toHaveLength(1);
   });
-});
 
-describe("/api/uploads/sign", () => {
-  beforeEach(() => {
-    events.length = 0;
-    cookieStore.clear();
-    events.push(
-      {
-        id: "evt-active",
-        slug: "active-event-1",
-        name: "Wedding",
-        event_date: null,
-        pin: null,
-        status: "active",
-        uploads_close_at: null,
-        storage_expires_at: null,
-      },
-      {
-        id: "evt-pin",
-        slug: "pin-event-1",
-        name: "PINned",
-        event_date: null,
-        pin: "2468",
-        status: "active",
-        uploads_close_at: null,
-        storage_expires_at: null,
-      },
-    );
+  // 23505 idempotency — the FRI-13 resumable path fires `register` twice when
+  // the first response is eaten by a dropped connection AFTER the row was
+  // inserted. The queue row pins one storage path across retries, so the
+  // second register targets the SAME path — removing the object here would
+  // break the row inserted by the first call.
+  it("is idempotent on a same-path retry: returns existing mediaId, does not remove the object", async () => {
+    const body = baseBody();
+    const first = await registerPOST(reqWith(body));
+    expect(first.status).toBe(200);
+    const firstJson = (await first.json()) as { mediaId: string; duplicate: boolean };
+    expect(firstJson.duplicate).toBe(false);
+    expect(mediaRows).toHaveLength(1);
+
+    // Retry with the identical body — models the second drain after the
+    // uploader marked the item failed on a lost response.
+    const second = await registerPOST(reqWith(body));
+    expect(second.status).toBe(200);
+    const secondJson = (await second.json()) as { mediaId: string; duplicate: boolean };
+    expect(secondJson.duplicate).toBe(true);
+    // Same id as the first call — callers can attribute the media without
+    // knowing whether it was fresh or a retry.
+    expect(secondJson.mediaId).toBe(firstJson.mediaId);
+    // Critical: the storage object must NOT be removed on a same-path retry.
+    // Otherwise the row inserted by the first call points at a dead object.
+    expect(removed).toEqual([]);
+    // The insert() call was attempted a second time but the unique index
+    // rejected it — one row survives.
+    expect(mediaRows).toHaveLength(1);
   });
 
-  function signReq(body: unknown): Request {
-    return new Request("http://localhost/api/uploads/sign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+  it("orphans the object on a different-path collision (same guest re-picks a photo)", async () => {
+    // First insert: fresh path A.
+    const first = await registerPOST(
+      reqWith(baseBody({ path: "events/evt-active/aaa.jpg" })),
+    );
+    expect(first.status).toBe(200);
+    const firstJson = (await first.json()) as { mediaId: string };
+
+    // Second insert: same content_hash, DIFFERENT path (FRI-11 direct-upload
+    // assigns a fresh UUID per attempt). The existing row still points at
+    // path A, so path B is a freshly-uploaded orphan that should be removed.
+    const second = await registerPOST(
+      reqWith(baseBody({ path: "events/evt-active/bbb.jpg" })),
+    );
+    expect(second.status).toBe(200);
+    const secondJson = (await second.json()) as { mediaId: string; duplicate: boolean };
+    expect(secondJson.duplicate).toBe(true);
+    // Still returns the existing mediaId (matches the same-path retry).
+    expect(secondJson.mediaId).toBe(firstJson.mediaId);
+    // The orphan at path B was cleaned up.
+    expect(removed).toEqual(["events/evt-active/bbb.jpg"]);
+    // First row survives untouched.
+    expect(mediaRows).toHaveLength(1);
+    expect(mediaRows[0].storage_path).toBe("events/evt-active/aaa.jpg");
+  });
+
+  // Rate-limit acceptance for FRI-15 / TECH_SPEC §9. The register route inserts
+  // rows and issues signed URLs against storage; without a limiter a hostile
+  // client could inflate the media table and storage costs on a live event.
+  // These tests re-pick a different `path` per request (with a matching
+  // `contentHash`) so we stay on the dedupe branch — the insert side is not
+  // what's under test here, the request-counting is.
+  describe("rate limiting", () => {
+    // A fresh content_hash per request keeps the storage-object check happy
+    // (fakeStorage responds ok for any path) and avoids hitting the 23505
+    // dedupe branch, which is exercised by the tests above.
+    const rlBody = (i: number, overrides: { token?: string } = {}) => ({
+      slug: "active-event-1",
+      path: `events/evt-active/rl-${i.toString().padStart(3, "0")}.jpg`,
+      bytes: 1024,
+      width: 100,
+      height: 100,
+      contentHash: `hash-${i}`,
+      uploaderToken: overrides.token ?? "guest-token",
+      uploaderName: null,
     });
-  }
 
-  it("returns a signed upload URL for an active event", async () => {
-    const res = await signPOST(
-      signReq({ slug: "active-event-1", contentType: "image/jpeg" }),
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { signedUrl: string; path: string; eventId: string };
-    expect(body.signedUrl).toMatch(/^https:\/\/storage\.test\//);
-    expect(body.path.startsWith("events/evt-active/")).toBe(true);
-    expect(body.path.endsWith(".jpg")).toBe(true);
-    expect(body.eventId).toBe("evt-active");
-  });
+    it("allows 60 requests within the window and 429s the 61st", async () => {
+      for (let i = 0; i < 60; i += 1) {
+        const res = await registerPOST(
+          reqWith(rlBody(i), { "x-forwarded-for": "10.0.0.1" }),
+        );
+        expect(res.status).toBe(200);
+      }
+      const overflow = await registerPOST(
+        reqWith(rlBody(60), { "x-forwarded-for": "10.0.0.1" }),
+      );
+      expect(overflow.status).toBe(429);
+      const retryAfter = overflow.headers.get("Retry-After");
+      expect(retryAfter).not.toBeNull();
+      expect(Number(retryAfter)).toBeGreaterThan(0);
+      // The overflowed request must not have inserted a media row.
+      expect(mediaRows).toHaveLength(60);
+    });
 
-  it("rejects unknown slugs", async () => {
-    const res = await signPOST(
-      signReq({ slug: "no-such-slug", contentType: "image/jpeg" }),
-    );
-    expect(res.status).toBe(404);
-  });
+    it("keys the limiter on (ip + uploaderToken) so a second guest is not punished", async () => {
+      for (let i = 0; i < 60; i += 1) {
+        const res = await registerPOST(
+          reqWith(rlBody(i, { token: "guest-A" }), { "x-forwarded-for": "10.0.0.1" }),
+        );
+        expect(res.status).toBe(200);
+      }
+      // Same IP, different uploaderToken — the venue-NAT case. Must not 429.
+      const other = await registerPOST(
+        reqWith(rlBody(999, { token: "guest-B" }), { "x-forwarded-for": "10.0.0.1" }),
+      );
+      expect(other.status).toBe(200);
+    });
 
-  it("rejects non-image content types", async () => {
-    const res = await signPOST(
-      signReq({ slug: "active-event-1", contentType: "application/zip" }),
-    );
-    expect(res.status).toBe(415);
-  });
+    it("resets the bucket once the window elapses", async () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-07-03T12:00:00.000Z"));
+        for (let i = 0; i < 60; i += 1) {
+          const res = await registerPOST(
+            reqWith(rlBody(i), { "x-forwarded-for": "10.0.0.1" }),
+          );
+          expect(res.status).toBe(200);
+        }
+        const overflow = await registerPOST(
+          reqWith(rlBody(60), { "x-forwarded-for": "10.0.0.1" }),
+        );
+        expect(overflow.status).toBe(429);
 
-  it("requires a valid PIN cookie when the event has a PIN", async () => {
-    const res = await signPOST(
-      signReq({ slug: "pin-event-1", contentType: "image/jpeg" }),
-    );
-    expect(res.status).toBe(401);
-  });
-
-  it("accepts an active event when the PIN cookie is set", async () => {
-    cookieStore.set("gp_pin_pin-event-1", expectedPinCookie("pin-event-1", "2468"));
-    const res = await signPOST(
-      signReq({ slug: "pin-event-1", contentType: "image/jpeg" }),
-    );
-    expect(res.status).toBe(200);
+        // Advance past the 60s window — the counter should reset.
+        vi.setSystemTime(new Date("2026-07-03T12:01:01.000Z"));
+        const afterReset = await registerPOST(
+          reqWith(rlBody(61), { "x-forwarded-for": "10.0.0.1" }),
+        );
+        expect(afterReset.status).toBe(200);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
+
+// The FRI-11 `/api/uploads/sign` route was retired in FRI-14 — the resumable
+// path (compress → enqueue → TUS via anon-key + RLS on `event-media`) does
+// not need a per-object signed URL, so we drop the whole endpoint rather
+// than let a dead code path linger.

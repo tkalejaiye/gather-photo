@@ -65,7 +65,7 @@ export default async function GuestUploadPage({ params, searchParams }: Props) {
         <h1 className="text-2xl font-semibold text-brand">Share your photos</h1>
         <p className="text-sm text-neutral-400">{event.name}</p>
       </header>
-      <GuestUpload slug={event.slug} />
+      <GuestUpload slug={event.slug} eventId={event.id} />
     </main>
   );
 }

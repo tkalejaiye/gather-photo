@@ -365,6 +365,51 @@ describe("drainQueue — resume across a mid-upload network drop (THE FRI-13 acc
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("resumes when the previous session died mid-transfer and left the row at 'uploading'", async () => {
+    // Real reload scenario (FRI-14 acceptance criterion 2): the tab closed
+    // BEFORE the uploader had a chance to write a terminal status. The row
+    // sits in IndexedDB with status='uploading', blob intact, and the
+    // persisted `tusUploadUrl` pointing at a partial transfer. The next
+    // drain (from load, `online`, or visibilitychange) must promote that
+    // stranded row and resume from the last committed byte. Before the
+    // FRI-14 fix drainQueue only touched `failed`, so a reload-mid-upload
+    // row was stuck forever even with every byte on disk.
+    const store = makeStore();
+    const server = new FakeTusServer();
+    const tus = makeFakeTus(server, { dropped: new Set() });
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ mediaId: "m1", duplicate: false }),
+    );
+
+    // Seed the row directly to model the "previous session left this behind"
+    // state: status='uploading', persisted tusUploadUrl, blob still present.
+    const blob = makeBlob(6_000);
+    const url = "https://fake-tus.local/upload/reload-seed";
+    server.createSlot(url, blob.size);
+    server.receive(url, 2_500);
+    const rowId = crypto.randomUUID();
+    const seeded: UploadItem = {
+      ...makeInput({ blob, bytes: 6_000 }),
+      id: rowId,
+      status: "uploading",
+      progress: 2_500 / 6_000,
+      attempts: 1,
+      createdAt: 1_000,
+      updatedAt: 1_000,
+      tusUploadUrl: url,
+    };
+    (await queueDeps(store).open!()).put(seeded);
+
+    await drainQueue(makeDeps(store, tus, fetchMock));
+
+    const final = await get(rowId, queueDeps(store));
+    expect(final?.status).toBe("done");
+    // Same URL — resumed, not re-created.
+    expect(final?.tusUploadUrl).toBe(url);
+    // Server saw exactly the remaining bytes on top of the pre-seeded 2.5 KB.
+    expect(server.totalBytesReceived.get(url)).toBe(6_000);
+  });
+
   it("survives a FULL PAGE RELOAD between the drop and the resume", async () => {
     // Same as above, but between the two drains we throw away the uploader
     // module's own state (draining guard) AND rebuild the queue connection —

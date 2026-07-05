@@ -3,8 +3,19 @@ import Link from "next/link";
 import QRCode from "qrcode";
 import { createClient } from "@/lib/supabase/server";
 import { CopyLinkButton } from "./CopyLinkButton";
+import { GalleryGrid } from "./GalleryGrid";
+import {
+  DEFAULT_PAGE_SIZE,
+  fetchTotalCount,
+  fetchUploaderSummary,
+  loadGalleryPage,
+} from "@/lib/gallery/queries";
 
 export const metadata = { title: "Event · gather.photo" };
+// Signed URLs are short-lived; caching the initial HTML would hand a returning
+// host a stale URL from a prior render. `no-store` is cheap here — this route
+// is host-only and low-traffic.
+export const dynamic = "force-dynamic";
 
 export default async function EventDetailPage({
   params,
@@ -25,13 +36,13 @@ export default async function EventDetailPage({
     .maybeSingle();
   if (!event) notFound();
 
-  // M1 stand-in for the host gallery (FRI-19). Lets the host verify that a
-  // guest upload landed without opening Supabase Studio.
-  const { count: mediaCount } = await supabase
-    .from("media")
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", event.id)
-    .eq("status", "active");
+  // Fan the three gallery reads out in parallel — they hit independent
+  // indexes and don't depend on one another.
+  const [initialPage, mediaCount, uploaders] = await Promise.all([
+    loadGalleryPage(supabase, event.id, { offset: 0, limit: DEFAULT_PAGE_SIZE }),
+    fetchTotalCount(supabase, event.id),
+    fetchUploaderSummary(supabase, event.id),
+  ]);
 
   // Fail loud if a prod deploy forgot to set this — a localhost QR on a
   // wedding card is a much worse outcome than a 500.
@@ -51,7 +62,7 @@ export default async function EventDetailPage({
   });
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
+    <main className="mx-auto max-w-5xl px-6 py-10">
       <Link
         href="/dashboard"
         className="text-xs uppercase tracking-wide text-neutral-400 hover:text-neutral-200"
@@ -83,15 +94,12 @@ export default async function EventDetailPage({
         </div>
       </section>
 
-      <section className="mt-6 rounded border border-neutral-800 p-6">
-        <h2 className="text-sm font-medium text-neutral-200">Photos</h2>
-        <p className="mt-1 text-2xl font-semibold text-neutral-100">
-          {mediaCount ?? 0}
-        </p>
-        <p className="mt-1 text-xs text-neutral-500">
-          Full gallery view lands in M3.
-        </p>
-      </section>
+      <GalleryGrid
+        eventId={event.id}
+        totalCount={mediaCount}
+        uploaders={uploaders}
+        initialPage={initialPage}
+      />
 
       <section className="mt-6 rounded border border-neutral-800 p-6">
         <h2 className="text-sm font-medium text-neutral-200">QR code</h2>

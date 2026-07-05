@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "verify:supabase": "node --env-file=.env.local scripts/verify-supabase.mjs"
+    "verify:supabase": "node --env-file=.env.local scripts/verify-supabase.mjs",
+    "seed:gallery": "node --env-file=.env.local scripts/seed-gallery.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

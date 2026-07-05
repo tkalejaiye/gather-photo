@@ -172,7 +172,6 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "http://localhost:54321";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
 
 import { POST as registerPOST } from "@/app/api/uploads/register/route";
-import { POST as signPOST } from "@/app/api/uploads/sign/route";
 import { __resetRateLimitForTests } from "@/lib/upload/rate-limit";
 
 // Every rate-limit test injects an `x-forwarded-for` so the limiter keys off
@@ -469,80 +468,7 @@ describe("/api/uploads/register", () => {
   });
 });
 
-describe("/api/uploads/sign", () => {
-  beforeEach(() => {
-    events.length = 0;
-    cookieStore.clear();
-    events.push(
-      {
-        id: "evt-active",
-        slug: "active-event-1",
-        name: "Wedding",
-        event_date: null,
-        pin: null,
-        status: "active",
-        uploads_close_at: null,
-        storage_expires_at: null,
-      },
-      {
-        id: "evt-pin",
-        slug: "pin-event-1",
-        name: "PINned",
-        event_date: null,
-        pin: "2468",
-        status: "active",
-        uploads_close_at: null,
-        storage_expires_at: null,
-      },
-    );
-  });
-
-  function signReq(body: unknown): Request {
-    return new Request("http://localhost/api/uploads/sign", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  }
-
-  it("returns a signed upload URL for an active event", async () => {
-    const res = await signPOST(
-      signReq({ slug: "active-event-1", contentType: "image/jpeg" }),
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { signedUrl: string; path: string; eventId: string };
-    expect(body.signedUrl).toMatch(/^https:\/\/storage\.test\//);
-    expect(body.path.startsWith("events/evt-active/")).toBe(true);
-    expect(body.path.endsWith(".jpg")).toBe(true);
-    expect(body.eventId).toBe("evt-active");
-  });
-
-  it("rejects unknown slugs", async () => {
-    const res = await signPOST(
-      signReq({ slug: "no-such-slug", contentType: "image/jpeg" }),
-    );
-    expect(res.status).toBe(404);
-  });
-
-  it("rejects non-image content types", async () => {
-    const res = await signPOST(
-      signReq({ slug: "active-event-1", contentType: "application/zip" }),
-    );
-    expect(res.status).toBe(415);
-  });
-
-  it("requires a valid PIN cookie when the event has a PIN", async () => {
-    const res = await signPOST(
-      signReq({ slug: "pin-event-1", contentType: "image/jpeg" }),
-    );
-    expect(res.status).toBe(401);
-  });
-
-  it("accepts an active event when the PIN cookie is set", async () => {
-    cookieStore.set("gp_pin_pin-event-1", expectedPinCookie("pin-event-1", "2468"));
-    const res = await signPOST(
-      signReq({ slug: "pin-event-1", contentType: "image/jpeg" }),
-    );
-    expect(res.status).toBe(200);
-  });
-});
+// The FRI-11 `/api/uploads/sign` route was retired in FRI-14 — the resumable
+// path (compress → enqueue → TUS via anon-key + RLS on `event-media`) does
+// not need a per-object signed URL, so we drop the whole endpoint rather
+// than let a dead code path linger.

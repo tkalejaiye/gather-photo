@@ -122,12 +122,33 @@ function defaultFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Res
   return globalThis.fetch(input, init);
 }
 
+/**
+ * Headers Supabase's TUS endpoint expects for anon-scoped writes to a private
+ * bucket (see supabase/migrations/0003_storage_rls.sql):
+ *   - `authorization` + `apikey` carry the public anon key; RLS on
+ *     `storage.objects` gates the actual write to `events/{event_id}/...`
+ *     under an active, unexpired event.
+ *   - `x-upsert: true` lets a resumed upload PATCH an existing chunk row
+ *     without 409-ing on "already exists" — the resume path relies on this.
+ * Only assembled when the anon key is present so tests that leave the env
+ * unset still get an empty header set (matches the old default of `{}`).
+ */
+function defaultTusHeaders(): Record<string, string> {
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!anonKey) return {};
+  return {
+    authorization: `Bearer ${anonKey}`,
+    apikey: anonKey,
+    "x-upsert": "true",
+  };
+}
+
 const defaultDeps: UploaderDeps = {
   loadTus: defaultLoadTus,
   fetch: defaultFetch,
   tusEndpoint: process.env.NEXT_PUBLIC_SUPABASE_TUS_ENDPOINT ?? "",
   registerEndpoint: "/api/uploads/register",
-  tusHeaders: {},
+  tusHeaders: defaultTusHeaders(),
   inFlightCap: DEFAULT_IN_FLIGHT_CAP,
   maxAttempts: MAX_ATTEMPTS,
   queue: {},
@@ -152,15 +173,21 @@ export async function drainQueue(overrides: Partial<UploaderDeps> = {}): Promise
   draining = true;
   try {
     const deps = { ...defaultDeps, ...overrides };
-    // Promote failed items back to `queued` so this drain retries them.
-    // tus-js-client's exponential backoff (RETRY_DELAYS) handles per-connection
-    // hiccups; this promotion is what turns the `online` event and app reopen
-    // into a real retry point for items whose in-connection retries were
-    // exhausted. Bounded by `maxAttempts` so a genuinely broken photo can't
-    // spin every reconnect. NB: we promote ONCE per drain (before the claim
-    // loop) — a fresh failure in this drain waits for the next connectivity
-    // signal instead of tight-looping.
-    await promoteFailedForRetry(deps);
+    // Promote failed + stranded items back to `queued` so this drain retries them.
+    //   - `failed`: exhausted tus-js-client's per-connection retries; the
+    //     `online` event and app reopen is the sanctioned retry point.
+    //   - `uploading`: a row that the previous session left mid-transfer when
+    //     the tab died. The `draining` guard means no live drain owns it now,
+    //     so it's provably stale — flip it back to `queued` and the resume
+    //     will re-use its persisted `tusUploadUrl`. Without this, an
+    //     interrupted-reload upload would be stuck in `uploading` forever
+    //     even though every byte we need to resume is on disk (FRI-14
+    //     acceptance criterion 2, TECH_SPEC §5).
+    // Bounded by `maxAttempts` so a genuinely broken photo can't spin every
+    // reconnect. NB: we promote ONCE per drain (before the claim loop) —
+    // a fresh failure in this drain waits for the next connectivity signal
+    // instead of tight-looping.
+    await promoteForRetry(deps);
     const tus = await deps.loadTus();
     // Loop until the queue is empty — new items enqueued during this drain
     // (or items freed up by the in-flight cap) get picked up in the next
@@ -175,10 +202,13 @@ export async function drainQueue(overrides: Partial<UploaderDeps> = {}): Promise
   }
 }
 
-async function promoteFailedForRetry(deps: UploaderDeps): Promise<void> {
-  const failed = await getByStatus(["failed"], deps.queue);
+async function promoteForRetry(deps: UploaderDeps): Promise<void> {
+  // Both statuses are equally recoverable — the queue keeps `blob` +
+  // `tusUploadUrl` for anything that hasn't reached `done`, so requeue
+  // handles the resume the same way in both cases.
+  const stranded = await getByStatus(["failed", "uploading"], deps.queue);
   await Promise.all(
-    failed
+    stranded
       // Blobless rows can't be retried (bytes freed on markDone or missing).
       // The attempts check keeps us from spinning on a poison item forever.
       .filter((item) => item.blob !== null && item.attempts < deps.maxAttempts)

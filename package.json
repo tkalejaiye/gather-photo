@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "verify:supabase": "node --env-file=.env.local scripts/verify-supabase.mjs",
     "verify:fri17": "node --env-file=.env.local scripts/verify-fri17-cross-host.mjs",
+    "verify:fri18": "node --env-file=.env.local --expose-gc scripts/verify-fri18-download-memory.mjs",
     "seed:gallery": "node --env-file=.env.local scripts/seed-gallery.mjs"
   },
   "dependencies": {

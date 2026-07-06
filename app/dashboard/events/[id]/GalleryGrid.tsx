@@ -324,18 +324,30 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
           </span>
         </h2>
         {visibleTotal > 0 && (
-          <button
-            type="button"
-            onClick={toggleSelectMode}
-            className={
-              selectMode
-                ? "rounded border border-neutral-700 bg-neutral-800 px-3 py-1 text-xs text-neutral-100 hover:bg-neutral-700"
-                : "rounded border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600"
-            }
-            aria-pressed={selectMode}
-          >
-            {selectMode ? "Cancel" : "Select"}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* FRI-18: streamed ZIP export. A plain <a> beats fetch()+Blob
+                because the browser can spool multi-GB responses to disk
+                as they arrive, whereas Blob buffers the whole payload. */}
+            <a
+              href={`/api/events/${eventId}/download`}
+              className="rounded border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600"
+              aria-label="Download all photos as ZIP"
+            >
+              Download all
+            </a>
+            <button
+              type="button"
+              onClick={toggleSelectMode}
+              className={
+                selectMode
+                  ? "rounded border border-neutral-700 bg-neutral-800 px-3 py-1 text-xs text-neutral-100 hover:bg-neutral-700"
+                  : "rounded border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600"
+              }
+              aria-pressed={selectMode}
+            >
+              {selectMode ? "Cancel" : "Select"}
+            </button>
+          </div>
         )}
       </div>
 

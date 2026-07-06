@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SignInForm } from "./SignInForm";
 
@@ -18,20 +19,30 @@ export default async function SignInPage({ searchParams }: Props) {
   const error = searchParams.error;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
-      <h1 className="text-2xl font-semibold text-brand">Sign in</h1>
-      <p className="mt-2 text-sm text-neutral-400">
-        Hosts only. Guests don&apos;t need an account — they just open the event
-        link.
-      </p>
-      {error && (
-        <p className="mt-4 rounded border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-300">
-          {error === "missing_code"
-            ? "That sign-in link is missing its code. Request a new one."
-            : error}
-        </p>
-      )}
-      <SignInForm />
+    <main className="app-shell flex min-h-screen items-center px-6 py-10">
+      <div className="mx-auto w-full max-w-md">
+        <Link
+          href="/"
+          className="h-eyebrow inline-flex items-center gap-1 text-ink-300 transition hover:text-white"
+        >
+          ← gather.photo
+        </Link>
+        <div className="card mt-5">
+          <p className="h-eyebrow">Hosts only</p>
+          <h1 className="h-display mt-1 text-4xl">Sign in</h1>
+          <p className="mt-3 text-sm text-ink-200">
+            Guests don&apos;t need an account — they just open the event link.
+          </p>
+          {error && (
+            <p className="banner-error mt-5" role="alert">
+              {error === "missing_code"
+                ? "That sign-in link is missing its code. Request a new one."
+                : error}
+            </p>
+          )}
+          <SignInForm />
+        </div>
+      </div>
     </main>
   );
 }

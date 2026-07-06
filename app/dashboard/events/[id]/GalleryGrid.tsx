@@ -315,33 +315,35 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
   );
 
   return (
-    <section className="mt-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h2 className="text-sm font-medium text-neutral-200">
-          Photos ·{" "}
-          <span className="text-neutral-100">
-            {filter === "all" ? visibleTotal : `${filterTotal} of ${visibleTotal}`}
-          </span>
-        </h2>
+    <section className="mt-10">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="h-eyebrow">The roll</p>
+          <h2 className="h-display mt-1 text-3xl">
+            {filter === "all"
+              ? `${visibleTotal} ${visibleTotal === 1 ? "photo" : "photos"}`
+              : `${filterTotal} of ${visibleTotal}`}
+          </h2>
+        </div>
         {visibleTotal > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* FRI-18: streamed ZIP export. A plain <a> beats fetch()+Blob
                 because the browser can spool multi-GB responses to disk
                 as they arrive, whereas Blob buffers the whole payload. */}
             <a
               href={`/api/events/${eventId}/download`}
-              className="rounded border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600"
+              className="btn-ghost !px-4 !py-2 text-xs"
               aria-label="Download all photos as ZIP"
             >
-              Download all
+              ⬇ Download all
             </a>
             <button
               type="button"
               onClick={toggleSelectMode}
               className={
                 selectMode
-                  ? "rounded border border-neutral-700 bg-neutral-800 px-3 py-1 text-xs text-neutral-100 hover:bg-neutral-700"
-                  : "rounded border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600"
+                  ? "btn-plum !px-4 !py-2 text-xs"
+                  : "btn-ghost !px-4 !py-2 text-xs"
               }
               aria-pressed={selectMode}
             >
@@ -355,7 +357,7 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
         <div
           role="tablist"
           aria-label="Filter photos by uploader"
-          className="mt-3 flex flex-wrap gap-2"
+          className="mt-4 flex flex-wrap gap-2"
         >
           <FilterPill
             active={filter === "all"}
@@ -382,13 +384,16 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       )}
 
       {items.length === 0 && !loading ? (
-        <p className="mt-6 text-sm text-neutral-500">
-          {filter === "all"
-            ? "No photos yet. Share the guest link to start collecting."
-            : "No photos from this uploader."}
-        </p>
+        <div className="card mt-6 text-center">
+          <p className="text-2xl">🎬</p>
+          <p className="mt-2 text-sm text-ink-200">
+            {filter === "all"
+              ? "No photos yet. Share the guest link to start collecting."
+              : "No photos from this uploader."}
+          </p>
+        </div>
       ) : (
-        <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <ul className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {items.map((item, index) => {
             const isSelected = selected.has(item.id);
             return (
@@ -398,8 +403,10 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
                   onClick={() => onThumbClick(item.id, index)}
                   aria-pressed={selectMode ? isSelected : undefined}
                   className={
-                    "group relative block aspect-square w-full overflow-hidden rounded bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-brand" +
-                    (selectMode && isSelected ? " ring-2 ring-brand" : "")
+                    "group relative block aspect-square w-full overflow-hidden rounded-2xl bg-ink-800 transition focus:outline-none focus:ring-2 focus:ring-pop-400" +
+                    (selectMode && isSelected
+                      ? " ring-2 ring-pop-400 ring-offset-2 ring-offset-ink"
+                      : "")
                   }
                   aria-label={
                     selectMode
@@ -418,7 +425,7 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
                     loading="lazy"
                     decoding="async"
                     className={
-                      "h-full w-full object-cover transition group-hover:opacity-90" +
+                      "h-full w-full object-cover transition duration-200 group-hover:scale-[1.02] group-hover:opacity-95" +
                       (selectMode && isSelected ? " opacity-70" : "")
                     }
                   />
@@ -426,10 +433,10 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
                     <span
                       aria-hidden="true"
                       className={
-                        "absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold shadow " +
+                        "absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shadow " +
                         (isSelected
-                          ? "border-brand bg-brand text-white"
-                          : "border-neutral-500 bg-neutral-950/80 text-neutral-300")
+                          ? "bg-pop-gradient text-white"
+                          : "border border-white/40 bg-black/50 text-white/70 backdrop-blur")
                       }
                     >
                       {isSelected ? "✓" : ""}
@@ -443,12 +450,12 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       )}
 
       {error && (
-        <div className="mt-4 flex items-center gap-3 rounded border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-200">
-          <span>{error}</span>
+        <div className="banner-error mt-5 flex items-center gap-3">
+          <span className="flex-1">{error}</span>
           <button
             type="button"
             onClick={() => nextOffset !== null && fetchPage(nextOffset, filter, "append")}
-            className="rounded border border-red-800 px-2 py-1 text-xs text-red-100 hover:border-red-600"
+            className="rounded-pill border border-red-400/40 px-3 py-1 text-xs font-semibold text-red-100 hover:border-red-300"
           >
             Retry
           </button>
@@ -456,18 +463,15 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       )}
 
       {deleteError && (
-        <div
-          role="alert"
-          className="mt-4 flex items-center gap-3 rounded border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-200"
-        >
-          <span>{deleteError}</span>
+        <div role="alert" className="banner-error mt-5">
+          {deleteError}
         </div>
       )}
 
       {hasMore && (
         <div
           ref={sentinelRef}
-          className="mt-6 flex items-center justify-center py-6 text-xs text-neutral-500"
+          className="mt-6 flex items-center justify-center py-6 text-xs text-ink-300"
           aria-hidden={!hasMore}
         >
           {loading ? "Loading more…" : "Scroll for more"}
@@ -480,8 +484,8 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
           aria-label="Selection actions"
           className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4"
         >
-          <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-neutral-800 bg-neutral-950/95 px-4 py-2 shadow-lg backdrop-blur">
-            <span className="text-xs text-neutral-300">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-pill border border-white/10 bg-ink-800/95 px-4 py-2 shadow-plum backdrop-blur">
+            <span className="text-xs font-medium text-ink-100">
               {selected.size === 0
                 ? "Tap photos to select"
                 : `${selected.size} selected`}
@@ -490,14 +494,14 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
               type="button"
               onClick={onDeleteSelected}
               disabled={selected.size === 0 || deleting}
-              className="rounded-full bg-red-600 px-3 py-1 text-xs font-medium text-white shadow hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-neutral-800 disabled:text-neutral-500"
+              className="rounded-pill bg-red-500 px-3 py-1 text-xs font-semibold text-white shadow transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-ink-300"
             >
               {deleting ? "Deleting…" : `Delete${selected.size ? ` ${selected.size}` : ""}`}
             </button>
             <button
               type="button"
               onClick={toggleSelectMode}
-              className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
+              className="rounded-pill border border-white/15 px-3 py-1 text-xs text-white transition hover:bg-white/[0.06]"
             >
               Cancel
             </button>
@@ -544,14 +548,12 @@ function FilterPill({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={
-        active
-          ? "rounded-full bg-brand px-3 py-1 text-xs font-medium text-white"
-          : "rounded-full border border-neutral-800 bg-neutral-950 px-3 py-1 text-xs text-neutral-300 hover:border-neutral-600"
-      }
+      className={active ? "chip chip-active" : "chip"}
     >
       {label}
-      <span className="ml-1.5 text-neutral-400">{count}</span>
+      <span className={active ? "ml-1 text-white/80" : "ml-1 text-ink-300"}>
+        {count}
+      </span>
     </button>
   );
 }
@@ -581,7 +583,7 @@ function Lightbox({
       role="dialog"
       aria-modal="true"
       aria-label={item.uploaderName ? `Photo by ${item.uploaderName}` : "Photo"}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
       onClick={onClose}
       onKeyDown={onBackdropKey}
       tabIndex={-1}
@@ -594,18 +596,21 @@ function Lightbox({
         <img
           src={item.url}
           alt={item.uploaderName ? `Photo by ${item.uploaderName}` : "Photo"}
-          className="max-h-[85vh] max-w-[90vw] rounded object-contain"
+          className="max-h-[82vh] max-w-[92vw] rounded-2xl object-contain shadow-plum"
         />
-        <div className="mt-3 flex items-center gap-3 text-xs text-neutral-300">
-          <span>{item.uploaderName ?? "Anonymous"}</span>
-          <span className="text-neutral-500">·</span>
-          <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time>
-          <span className="text-neutral-500">·</span>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-ink-100">
+          <span className="font-medium text-white">
+            {item.uploaderName ?? "Anonymous"}
+          </span>
+          <span className="text-ink-400">·</span>
+          <time dateTime={item.createdAt}>
+            {new Date(item.createdAt).toLocaleString()}
+          </time>
           <button
             type="button"
             onClick={onDelete}
             disabled={deleting}
-            className="rounded border border-red-800 bg-red-950/60 px-2 py-1 text-xs text-red-200 hover:border-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-pill border border-red-400/40 bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-200 transition hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {deleting ? "Deleting…" : "Delete"}
           </button>
@@ -616,7 +621,7 @@ function Lightbox({
               type="button"
               onClick={onPrev}
               aria-label="Previous photo"
-              className="ml-2 h-10 w-10 rounded-full bg-neutral-900/80 text-neutral-100 hover:bg-neutral-800"
+              className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-lg text-white backdrop-blur transition hover:bg-white/[0.12]"
             >
               ‹
             </button>
@@ -628,7 +633,7 @@ function Lightbox({
               type="button"
               onClick={onNext}
               aria-label="Next photo"
-              className="mr-2 h-10 w-10 rounded-full bg-neutral-900/80 text-neutral-100 hover:bg-neutral-800"
+              className="mr-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-lg text-white backdrop-blur transition hover:bg-white/[0.12]"
             >
               ›
             </button>
@@ -638,7 +643,7 @@ function Lightbox({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute -right-2 -top-2 h-8 w-8 rounded-full bg-neutral-900 text-neutral-100 shadow hover:bg-neutral-800"
+          className="absolute -right-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-ink-800 text-sm text-white shadow-plum transition hover:bg-ink-700"
         >
           ✕
         </button>

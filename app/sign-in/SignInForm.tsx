@@ -31,45 +31,38 @@ export function SignInForm() {
     });
   }
 
-  const inputClass =
-    "w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:border-brand focus:outline-none";
-
   if (step === "verify") {
     return (
       <form onSubmit={onVerify} className="mt-6 space-y-4">
-        <p className="text-sm text-neutral-300">
+        <p className="text-sm text-ink-100">
           {channel === "email" ? (
             <>
-              We emailed <span className="font-medium">{contact}</span>. Open
-              the link in that email to finish signing in — or, if you received
-              a 6-digit code, paste it below.
+              We emailed <span className="font-semibold text-white">{contact}</span>.
+              Open the link in that email to finish signing in — or, if you
+              received a 6-digit code, paste it below.
             </>
           ) : (
             <>
-              We sent a code to <span className="font-medium">{contact}</span>.
+              We sent a code to{" "}
+              <span className="font-semibold text-white">{contact}</span>.
             </>
           )}
         </p>
         <label className="block">
-          <span className="text-xs uppercase tracking-wide text-neutral-400">
-            Code
-          </span>
+          <span className="field-label">Code</span>
           <input
             inputMode="numeric"
             autoComplete="one-time-code"
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            className={`mt-1 ${inputClass}`}
+            className="input mt-2 text-center text-lg tracking-[0.4em]"
+            placeholder="123456"
             required
           />
         </label>
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {pending ? "Verifying…" : "Verify"}
+        {error && <p className="text-sm text-red-300">{error}</p>}
+        <button type="submit" disabled={pending} className="btn-pop w-full">
+          {pending ? "Verifying…" : "Verify →"}
         </button>
         <button
           type="button"
@@ -78,7 +71,7 @@ export function SignInForm() {
             setToken("");
             setError(null);
           }}
-          className="text-xs text-neutral-400 underline"
+          className="text-xs text-ink-300 underline underline-offset-4 transition hover:text-white"
         >
           Use a different {channel === "email" ? "email" : "phone number"}
         </button>
@@ -98,18 +91,18 @@ export function SignInForm() {
               setContact("");
               setError(null);
             }}
-            className={`rounded px-3 py-1 ${
+            className={
               channel === c
-                ? "bg-brand text-white"
-                : "border border-neutral-700 text-neutral-300"
-            }`}
+                ? "chip chip-active"
+                : "chip"
+            }
           >
             {c === "email" ? "Email" : "Phone"}
           </button>
         ))}
       </div>
       <label className="block">
-        <span className="text-xs uppercase tracking-wide text-neutral-400">
+        <span className="field-label">
           {channel === "email" ? "Email" : "Phone (with country code)"}
         </span>
         <input
@@ -119,17 +112,13 @@ export function SignInForm() {
           placeholder={channel === "email" ? "you@example.com" : "+2348012345678"}
           value={contact}
           onChange={(e) => setContact(e.target.value)}
-          className={`mt-1 ${inputClass}`}
+          className="input mt-2"
           required
         />
       </label>
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded bg-brand px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-      >
-        {pending ? "Sending…" : "Send code"}
+      {error && <p className="text-sm text-red-300">{error}</p>}
+      <button type="submit" disabled={pending} className="btn-pop w-full">
+        {pending ? "Sending…" : "Send me a code →"}
       </button>
     </form>
   );

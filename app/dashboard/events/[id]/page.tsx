@@ -61,60 +61,75 @@ export default async function EventDetailPage({
     width: 320,
   });
 
+  const isOpen = event.status === "open";
+
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
-      <Link
-        href="/dashboard"
-        className="text-xs uppercase tracking-wide text-neutral-400 hover:text-neutral-200"
-      >
-        ← Back
-      </Link>
-      <header className="mt-4 flex items-baseline justify-between gap-4">
-        <h1 className="text-2xl font-semibold text-brand">{event.name}</h1>
-        <span className="text-xs uppercase tracking-wide text-neutral-400">
-          {event.status}
-        </span>
-      </header>
-      <p className="mt-1 text-sm text-neutral-500">
-        {event.event_date ?? "no date set"}
-        {event.pin ? " · PIN required" : ""}
-      </p>
+    <main className="app-shell min-h-screen px-6 py-10">
+      <div className="mx-auto max-w-5xl">
+        <Link
+          href="/dashboard"
+          className="h-eyebrow inline-flex items-center gap-1 text-ink-300 transition hover:text-white"
+        >
+          ← All events
+        </Link>
+        <header className="mt-5 flex flex-wrap items-baseline justify-between gap-3">
+          <div>
+            <p className="h-eyebrow">Event</p>
+            <h1 className="h-display mt-1 text-4xl sm:text-5xl">{event.name}</h1>
+            <p className="mt-2 text-sm text-ink-200">
+              {event.event_date ?? "No date set"}
+              {event.pin ? " · PIN required" : ""}
+            </p>
+          </div>
+          <span
+            className={isOpen ? "chip chip-active" : "chip"}
+            aria-label={`Status: ${event.status}`}
+          >
+            {event.status}
+          </span>
+        </header>
 
-      <section className="mt-8 rounded border border-neutral-800 p-6">
-        <h2 className="text-sm font-medium text-neutral-200">Guest link</h2>
-        <p className="mt-1 text-xs text-neutral-500">
-          Anyone with this link can upload photos.
-          {event.pin ? " They will also need the PIN." : ""}
-        </p>
-        <div className="mt-3 flex items-center gap-2">
-          <code className="flex-1 truncate rounded border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200">
-            {guestUrl}
-          </code>
-          <CopyLinkButton url={guestUrl} />
+        <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <section className="card">
+            <p className="h-eyebrow">Guest link</p>
+            <h2 className="mt-1 text-lg font-semibold text-white">
+              Share this to collect photos
+            </h2>
+            <p className="mt-1 text-xs text-ink-300">
+              Anyone with this link can upload photos.
+              {event.pin ? " They will also need the PIN." : ""}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white">
+                {guestUrl}
+              </code>
+              <CopyLinkButton url={guestUrl} />
+            </div>
+          </section>
+
+          <section className="card flex flex-col items-center text-center">
+            <p className="h-eyebrow">QR code</p>
+            <p className="mt-1 max-w-[220px] text-xs text-ink-300">
+              Print for signage — guests scan with their phone camera.
+            </p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrDataUrl}
+              alt={`QR code for ${guestUrl}`}
+              width={240}
+              height={240}
+              className="mt-3 h-56 w-56 rounded-2xl bg-white p-3 shadow-plum"
+            />
+          </section>
         </div>
-      </section>
 
-      <GalleryGrid
-        eventId={event.id}
-        totalCount={mediaCount}
-        uploaders={uploaders}
-        initialPage={initialPage}
-      />
-
-      <section className="mt-6 rounded border border-neutral-800 p-6">
-        <h2 className="text-sm font-medium text-neutral-200">QR code</h2>
-        <p className="mt-1 text-xs text-neutral-500">
-          Print this on signage. Guests scan with their phone camera.
-        </p>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={qrDataUrl}
-          alt={`QR code for ${guestUrl}`}
-          width={320}
-          height={320}
-          className="mt-4 h-80 w-80 rounded bg-white p-2"
+        <GalleryGrid
+          eventId={event.id}
+          totalCount={mediaCount}
+          uploaders={uploaders}
+          initialPage={initialPage}
         />
-      </section>
+      </div>
     </main>
   );
 }

@@ -10,6 +10,7 @@ import { GuestUpload } from "./GuestUpload";
 // FRI-9: name + uploader_token in localStorage, camera + multi-select shell.
 // M1: capture/select → compress → single upload.
 // M2: IndexedDB queue + resumable TUS + offline resume + progress UI.
+// FRI-26: visual pass — dark canvas, pop accent, chunky pill controls.
 
 type Props = {
   params: { slug: string };
@@ -27,14 +28,21 @@ export default async function GuestUploadPage({ params, searchParams }: Props) {
   // 404. Upload API routes stay at 404 for closed events.
   if (!isEventOpen(event)) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-3 px-6 text-center">
-        <h1 className="text-2xl font-semibold text-brand">{event.name}</h1>
-        <p className="text-sm text-neutral-400">
-          This event has ended. Uploads are closed.
-        </p>
-        <p className="text-xs text-neutral-500">
-          If you think this is a mistake, ask the host to check the event settings.
-        </p>
+      <main className="app-shell flex min-h-screen items-center justify-center px-6 py-10">
+        <div className="card mx-auto w-full max-w-md text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-pill bg-white/[0.06] text-2xl">
+            🎞️
+          </div>
+          <p className="h-eyebrow">That&apos;s a wrap</p>
+          <h1 className="h-display mt-2 text-3xl">{event.name}</h1>
+          <p className="mt-4 text-sm text-ink-200">
+            This event has ended. Uploads are closed.
+          </p>
+          <p className="mt-2 text-xs text-ink-300">
+            If you think this is a mistake, ask the host to check the event
+            settings.
+          </p>
+        </div>
       </main>
     );
   }
@@ -43,29 +51,39 @@ export default async function GuestUploadPage({ params, searchParams }: Props) {
     const ok = await hasValidPinCookie(event.slug);
     if (!ok) {
       return (
-        <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-6">
-          <h1 className="text-2xl font-semibold text-brand">{event.name}</h1>
-          <p className="text-sm text-neutral-400">
-            This event is PIN-protected. Enter the PIN to continue.
-          </p>
-          {searchParams.error && (
-            <p className="rounded border border-red-900/60 bg-red-950/30 px-3 py-2 text-sm text-red-300">
-              {searchParams.error}
+        <main className="app-shell flex min-h-screen items-center justify-center px-6 py-10">
+          <div className="mx-auto w-full max-w-md">
+            <p className="h-eyebrow text-center">PIN required</p>
+            <h1 className="h-display mt-2 text-center text-3xl">{event.name}</h1>
+            <p className="mt-3 text-center text-sm text-ink-200">
+              This event is PIN-protected. Enter the PIN to keep going.
             </p>
-          )}
-          <PinForm slug={event.slug} />
+            {searchParams.error && (
+              <p className="banner-error mt-6" role="alert">
+                {searchParams.error}
+              </p>
+            )}
+            <div className="mt-6">
+              <PinForm slug={event.slug} />
+            </div>
+          </div>
         </main>
       );
     }
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 px-6 py-10">
-      <header className="space-y-1 text-center">
-        <h1 className="text-2xl font-semibold text-brand">Share your photos</h1>
-        <p className="text-sm text-neutral-400">{event.name}</p>
-      </header>
-      <GuestUpload slug={event.slug} eventId={event.id} />
+    <main className="app-shell min-h-screen px-5 py-8">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+        <header className="pt-2 text-center">
+          <p className="h-eyebrow">You&apos;re on the guest list ✨</p>
+          <h1 className="h-display mt-2 text-[40px] leading-[1.02]">
+            Drop your photos
+          </h1>
+          <p className="mt-2 text-sm text-ink-200">{event.name}</p>
+        </header>
+        <GuestUpload slug={event.slug} eventId={event.id} />
+      </div>
     </main>
   );
 }

@@ -11,13 +11,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#6C3FB5",
+  themeColor: "#0E0E13",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className="bg-ink">
+      <body className="bg-ink text-ink-50 antialiased">{children}</body>
     </html>
   );
 }

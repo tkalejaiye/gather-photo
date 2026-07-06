@@ -295,9 +295,7 @@ export function GuestUpload({
   return (
     <div className="w-full space-y-5" data-slug={slug} data-event-id={eventId}>
       <label htmlFor={nameInputId} className="block">
-        <span className="text-xs uppercase tracking-wide text-neutral-400">
-          Your name (optional)
-        </span>
+        <span className="field-label">Your name (optional)</span>
         <input
           id={nameInputId}
           value={name}
@@ -305,14 +303,14 @@ export function GuestUpload({
           placeholder="So the host knows it was you"
           autoComplete="name"
           maxLength={60}
-          className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+          className="input mt-2"
         />
       </label>
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="block w-full cursor-pointer rounded bg-brand px-4 py-3 text-center text-sm font-medium text-white">
-            Take photo
+          <span className="btn-pop w-full cursor-pointer">
+            <span aria-hidden="true">📸</span> Take photo
           </span>
           <input
             type="file"
@@ -325,8 +323,8 @@ export function GuestUpload({
         </label>
 
         <label className="block">
-          <span className="block w-full cursor-pointer rounded border border-neutral-700 px-4 py-3 text-center text-sm font-medium text-neutral-100">
-            Choose photos
+          <span className="btn-ghost w-full cursor-pointer">
+            <span aria-hidden="true">🖼️</span> Choose photos
           </span>
           <input
             type="file"
@@ -339,21 +337,24 @@ export function GuestUpload({
       </div>
 
       {totalTracked > 0 ? (
-        <>
+        <div className="space-y-3">
           <div
             aria-live="polite"
-            className="flex items-center justify-between text-xs text-neutral-400"
+            className="flex flex-wrap items-baseline justify-between gap-2 rounded-2xl border border-white/5 bg-white/[0.02] px-4 py-3"
           >
-            <span>
-              {doneCount} of {totalTracked} uploaded
-              {failedCount > 0 ? ` · ${failedCount} failed` : ""}
+            <span className="text-sm font-semibold text-white">
+              <span className="text-pop-400">{doneCount}</span>
+              <span className="text-ink-300"> of {totalTracked} uploaded</span>
+              {failedCount > 0 ? (
+                <span className="text-red-300"> · {failedCount} failed</span>
+              ) : null}
             </span>
             {hasWork ? (
               // TECH_SPEC §8 + PRD §7: iOS pauses background JS. Uploads
               // resume when the guest returns, but the hint sets expectations
               // so they don't close the tab too fast.
-              <span className="text-neutral-500">
-                Keep this screen open until done.
+              <span className="text-[11px] uppercase tracking-wide text-ink-300">
+                Keep this screen open
               </span>
             ) : null}
           </div>
@@ -362,21 +363,22 @@ export function GuestUpload({
             {pending.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between gap-3 rounded border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-3 rounded-2xl border bg-white/[0.03] px-4 py-3 text-sm"
+                style={{ borderColor: "rgba(255,255,255,0.06)" }}
               >
-                <span className="min-w-0 flex-1 truncate text-neutral-200">
+                <span className="min-w-0 flex-1 truncate text-white">
                   {p.fileName}
                 </span>
-                <span className="shrink-0 text-xs text-neutral-500">
+                <span className="shrink-0 text-xs text-ink-300">
                   {formatBytes(p.fileSize)}
                 </span>
                 {p.state === "compressing" ? (
-                  <span className="shrink-0 text-xs text-neutral-400">
+                  <span className="shrink-0 animate-pulse-soft text-xs text-plum-200">
                     Preparing…
                   </span>
                 ) : (
                   <span
-                    className="shrink-0 text-xs text-red-400"
+                    className="shrink-0 text-xs text-red-300"
                     title={p.error}
                   >
                     Failed
@@ -387,7 +389,7 @@ export function GuestUpload({
                     type="button"
                     onClick={() => removePending(p.id)}
                     aria-label={`Remove ${p.fileName}`}
-                    className="shrink-0 rounded px-2 py-1 text-xs text-neutral-400 hover:text-neutral-100"
+                    className="shrink-0 rounded-pill px-2 py-1 text-xs text-ink-300 transition hover:text-white"
                   >
                     Remove
                   </button>
@@ -400,40 +402,55 @@ export function GuestUpload({
                 key={item.id}
                 data-item-id={item.id}
                 data-status={item.status}
-                className="flex items-center justify-between gap-3 rounded border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm"
+                className="rounded-2xl border bg-white/[0.03] px-4 py-3 text-sm"
+                style={{ borderColor: "rgba(255,255,255,0.06)" }}
               >
-                <span className="min-w-0 flex-1 truncate text-neutral-200">
-                  {item.path.split("/").pop() ?? item.path}
-                </span>
-                <span className="shrink-0 text-xs text-neutral-500">
-                  {formatBytes(item.bytes)}
-                </span>
-                <QueueBadge item={item} />
-                {item.status === "failed" ? (
-                  <button
-                    type="button"
-                    onClick={() => retryItem(item.id)}
-                    className="shrink-0 rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-100 hover:bg-neutral-800"
-                  >
-                    Retry
-                  </button>
-                ) : null}
-                {item.status === "failed" || item.status === "done" ? (
-                  <button
-                    type="button"
-                    onClick={() => removeItem(item.id)}
-                    aria-label="Remove"
-                    className="shrink-0 rounded px-2 py-1 text-xs text-neutral-400 hover:text-neutral-100"
-                  >
-                    Remove
-                  </button>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 flex-1 truncate text-white">
+                    {item.path.split("/").pop() ?? item.path}
+                  </span>
+                  <span className="shrink-0 text-xs text-ink-300">
+                    {formatBytes(item.bytes)}
+                  </span>
+                  <QueueBadge item={item} />
+                  {item.status === "failed" ? (
+                    <button
+                      type="button"
+                      onClick={() => retryItem(item.id)}
+                      className="shrink-0 rounded-pill border border-white/15 bg-white/[0.05] px-3 py-1 text-xs font-medium text-white transition hover:border-white/30"
+                    >
+                      Retry
+                    </button>
+                  ) : null}
+                  {item.status === "failed" || item.status === "done" ? (
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item.id)}
+                      aria-label="Remove"
+                      className="shrink-0 rounded-pill px-2 py-1 text-xs text-ink-300 transition hover:text-white"
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                {item.status === "uploading" ? (
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-pill bg-white/10">
+                    <div
+                      className="h-full rounded-pill bg-pop-gradient transition-[width] duration-200"
+                      style={{
+                        width: `${Math.round((item.progress ?? 0) * 100)}%`,
+                      }}
+                    />
+                  </div>
                 ) : null}
               </li>
             ))}
           </ul>
-        </>
+        </div>
       ) : (
-        <p className="text-sm text-neutral-500">No photos selected yet.</p>
+        <p className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-center text-sm text-ink-300">
+          Snap something 📷 — your photos land here.
+        </p>
       )}
     </div>
   );
@@ -442,21 +459,27 @@ export function GuestUpload({
 function QueueBadge({ item }: { item: UploadItem }) {
   switch (item.status) {
     case "queued":
-      return <span className="shrink-0 text-xs text-neutral-400">Queued</span>;
+      return (
+        <span className="shrink-0 rounded-pill bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-ink-200">
+          Queued
+        </span>
+      );
     case "uploading":
       return (
-        <span className="shrink-0 text-xs text-neutral-300">
+        <span className="shrink-0 rounded-pill bg-white/[0.06] px-2 py-0.5 text-[11px] font-semibold text-white">
           {Math.round((item.progress ?? 0) * 100)}%
         </span>
       );
     case "done":
       return (
-        <span className="shrink-0 text-xs text-emerald-400">Uploaded</span>
+        <span className="shrink-0 rounded-pill bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-300">
+          Done
+        </span>
       );
     case "failed":
       return (
         <span
-          className="shrink-0 text-xs text-red-400"
+          className="shrink-0 rounded-pill bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-300"
           title={item.lastError ?? "Upload failed"}
         >
           Failed

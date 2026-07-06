@@ -7,6 +7,7 @@ import { SignOutButton } from "./SignOutButton";
 // Host dashboard — gallery grid, counts, delete, ZIP download (M3).
 // FRI-7: gated behind Supabase auth.
 // FRI-8: lists the host's events and links to the create-event flow.
+// FRI-26: visual pass — dark canvas, cards, pill CTAs.
 
 export default async function DashboardPage() {
   const supabase = createClient();
@@ -25,57 +26,88 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-brand">Your events</h1>
-        <div className="flex items-center gap-3 text-sm text-neutral-300">
-          <span>{user.email ?? user.phone}</span>
-          <SignOutButton />
+    <main className="app-shell min-h-screen px-6 py-10">
+      <div className="mx-auto max-w-5xl">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href="/"
+            className="h-eyebrow inline-flex items-center gap-1 text-ink-300 transition hover:text-white"
+          >
+            gather.photo
+          </Link>
+          <div className="flex items-center gap-3 text-sm text-ink-200">
+            <span className="hidden sm:inline">{user.email ?? user.phone}</span>
+            <SignOutButton />
+          </div>
+        </header>
+
+        <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="h-eyebrow">Your events</p>
+            <h1 className="h-display mt-1 text-4xl sm:text-5xl">
+              What are we shooting? 📸
+            </h1>
+            <p className="mt-2 text-sm text-ink-200">
+              {events?.length
+                ? `${events.length} event${events.length === 1 ? "" : "s"} · tap to open`
+                : "Spin up your first event — takes about 20 seconds."}
+            </p>
+          </div>
+          <Link href="/dashboard/new" className="btn-pop">
+            + New event
+          </Link>
         </div>
-      </header>
 
-      <div className="mt-6 flex items-center justify-between">
-        <p className="text-sm text-neutral-400">
-          {events?.length
-            ? `${events.length} event${events.length === 1 ? "" : "s"}`
-            : "No events yet."}
-        </p>
-        <Link
-          href="/dashboard/new"
-          className="rounded bg-brand px-3 py-1.5 text-sm font-medium text-white"
-        >
-          New event
-        </Link>
+        {events && events.length > 0 ? (
+          <ul className="mt-8 grid gap-3 sm:grid-cols-2">
+            {events.map((e) => (
+              <li key={e.id}>
+                <Link
+                  href={`/dashboard/events/${e.id}`}
+                  className="card block transition hover:-translate-y-0.5 hover:border-white/20 focus:border-white/30 focus:outline-none"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-lg font-semibold text-white">
+                        {e.name}
+                      </div>
+                      <div className="mt-1 text-xs text-ink-300">
+                        {e.event_date ?? "no date"} · /e/{e.slug}
+                      </div>
+                    </div>
+                    <StatusBadge status={e.status} />
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="card mt-8 text-center">
+            <p className="mx-auto max-w-md text-sm text-ink-200">
+              Every event you create gets its own QR code + private gallery.
+              Guests scan, shoot, and every photo lands here.
+            </p>
+            <Link href="/dashboard/new" className="btn-plum mt-5 inline-flex">
+              Create your first event
+            </Link>
+          </div>
+        )}
       </div>
-
-      {events && events.length > 0 ? (
-        <ul className="mt-4 divide-y divide-neutral-800 rounded border border-neutral-800">
-          {events.map((e) => (
-            <li key={e.id}>
-              <Link
-                href={`/dashboard/events/${e.id}`}
-                className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-neutral-900"
-              >
-                <div>
-                  <div className="text-sm font-medium text-neutral-100">
-                    {e.name}
-                  </div>
-                  <div className="text-xs text-neutral-500">
-                    {e.event_date ?? "no date"} · /e/{e.slug}
-                  </div>
-                </div>
-                <span className="text-xs uppercase tracking-wide text-neutral-400">
-                  {e.status}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-4 text-sm text-neutral-500">
-          Gallery + ZIP download arrive in M3. See TECH_SPEC.md §6.
-        </p>
-      )}
     </main>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const isOpen = status === "open";
+  return (
+    <span
+      className={
+        isOpen
+          ? "chip chip-active shrink-0"
+          : "chip shrink-0"
+      }
+    >
+      {status}
+    </span>
   );
 }

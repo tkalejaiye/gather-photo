@@ -15,24 +15,20 @@ export function PinForm({ slug }: { slug: string }) {
   }
 
   return (
-    <form action={submit} className="space-y-3">
+    <form action={submit} className="space-y-4">
       <label className="block">
-        <span className="text-xs uppercase tracking-wide text-neutral-400">
-          PIN
-        </span>
+        <span className="field-label">PIN</span>
         <input
           name="pin"
           inputMode="numeric"
           autoComplete="off"
           required
-          className="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+          className="input mt-2 text-center text-lg tracking-[0.4em]"
+          placeholder="••••"
         />
       </label>
-      <button
-        type="submit"
-        className="w-full rounded bg-brand px-4 py-2 text-sm font-medium text-white"
-      >
-        Continue
+      <button type="submit" className="btn-pop w-full">
+        Unlock event →
       </button>
     </form>
   );

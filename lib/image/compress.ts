@@ -67,12 +67,21 @@ export async function compress(
   // HEIC can't be decoded by the canvas pipeline — convert to JPEG first.
   const source = isHeic(file) ? toJpegFile(await heicToJpeg(file), file.name) : file;
 
-  const blob = await compressImage(source, {
+  const compressed = await compressImage(source, {
     maxWidthOrHeight: MAX_EDGE,
     initialQuality: QUALITY,
     fileType: "image/jpeg", // normalize all outputs to JPEG
     useWebWorker: true,
     preserveExif: false, // orientation is baked into pixels; drop metadata to save bytes
+  });
+
+  // iOS Safari's IndexedDB throws "Error preparing Blob/File data to be stored
+  // in object store" on some worker-produced Blobs/Files — the structured
+  // clone path treats them as lifecycle-fragile and refuses to persist. Copy
+  // the bytes into a fresh main-thread Blob before returning so the enqueue in
+  // `lib/upload/queue.ts` can persist it durably on all iOS versions.
+  const blob = new Blob([await compressed.arrayBuffer()], {
+    type: compressed.type || "image/jpeg",
   });
 
   const { width, height } = await readDimensions(blob);

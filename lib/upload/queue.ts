@@ -90,11 +90,16 @@ export interface QueueDeps {
 }
 
 /**
- * Default cap on concurrent 'uploading' items. Low enough that a cheap phone
- * with a saturated uplink doesn't buffer many chunks in memory at once
- * (TECH_SPEC §10: cap in-flight queue size).
+ * Default cap on concurrent 'uploading' items. Serial (=1) because on iOS
+ * Safari, parallel TUS streams to Supabase Storage reliably stall at 0% —
+ * multiple long-lived PATCH connections through WebKit's fetch layer + the
+ * main-thread cost of concurrent onProgress/setProgress writes into
+ * IndexedDB creates a stall that never times out. Serial matches
+ * TECH_SPEC §10 ("cap in-flight queue size") and Supabase's own resumable-
+ * upload examples, and eliminates the entire class of failure at negligible
+ * throughput cost — a photo takes seconds, not minutes, to upload.
  */
-export const DEFAULT_IN_FLIGHT_CAP = 3;
+export const DEFAULT_IN_FLIGHT_CAP = 1;
 
 const DB_NAME = "gather-photo";
 const VERSION = 1;

@@ -210,8 +210,18 @@ async function promoteForRetry(deps: UploaderDeps): Promise<void> {
   await Promise.all(
     stranded
       // Blobless rows can't be retried (bytes freed on markDone or missing).
-      // The attempts check keeps us from spinning on a poison item forever.
-      .filter((item) => item.blob !== null && item.attempts < deps.maxAttempts)
+      // The attempts check bounds retries on a poison photo (bad content,
+      // oversize, mimetype rejected by RLS) — but ONLY for 'failed'.
+      // 'uploading' rows here are provably stranded (`draining` guarantees
+      // no live drain owns them) — leaving one behind permanently blocks
+      // its slot in claimNext's cap and starves every future queued item,
+      // which is exactly the "6 photos stuck" symptom seen on iOS Safari
+      // when tus-js-client's Promise never resolves. Always reclaim them.
+      .filter(
+        (item) =>
+          item.blob !== null &&
+          (item.status === "uploading" || item.attempts < deps.maxAttempts),
+      )
       .map((item) => requeue(item.id, deps.queue)),
   );
 }

@@ -241,16 +241,23 @@ export function GuestUpload({
     for (const job of jobs) {
       try {
         const compressed = await compress(job.file);
+        // Materialize the compressed image as a raw ArrayBuffer BEFORE it
+        // touches IndexedDB. iOS Safari's IDB silently file-backs any stored
+        // Blob and then the fetch layer refuses to send it as a request body
+        // (see `lib/upload/queue.ts` header). ArrayBuffer is durably stored
+        // as plain bytes and the uploader re-wraps it in a fresh in-memory
+        // Blob at upload time.
+        const data = await compressed.blob.arrayBuffer();
         await enqueue({
           id: job.id,
           eventSlug: slug,
           uploaderToken,
           uploaderName,
-          blob: compressed.blob,
+          data,
           path: buildStoragePath(eventId, job.id),
           contentType: compressed.blob.type || job.file.type || "image/jpeg",
           contentHash: compressed.contentHash,
-          bytes: compressed.blob.size,
+          bytes: data.byteLength,
           width: compressed.width,
           height: compressed.height,
         });

@@ -208,10 +208,10 @@ function makeFakeTus(server: FakeTusServer, hooks: FakeTusHooks): TusModule {
 // Test helpers
 // ────────────────────────────────────────────────────────────
 
-function makeBlob(size: number, seed = 0): Blob {
+function makeData(size: number, seed = 0): ArrayBuffer {
   const bytes = new Uint8Array(size);
   for (let i = 0; i < size; i++) bytes[i] = (i + seed) & 0xff;
-  return new Blob([bytes], { type: "image/jpeg" });
+  return bytes.buffer;
 }
 
 function makeInput(overrides: Partial<EnqueueInput> = {}): EnqueueInput {
@@ -220,7 +220,7 @@ function makeInput(overrides: Partial<EnqueueInput> = {}): EnqueueInput {
     eventSlug: "lagos-wedding-2026",
     uploaderToken: "guest-token-abc",
     uploaderName: "Amaka",
-    blob: makeBlob(8_000),
+    data: makeData(8_000),
     path: "events/lagos-wedding-2026/1234.jpg",
     contentType: "image/jpeg",
     contentHash: "a".repeat(64),
@@ -286,7 +286,7 @@ describe("drainQueue — happy path", () => {
     const stored = await get(item.id, queueDeps(store));
     expect(stored?.status).toBe("done");
     expect(stored?.progress).toBe(1);
-    expect(stored?.blob).toBeNull(); // freed on markDone
+    expect(stored?.data).toBeNull(); // freed on markDone
     // URL persisted so a future retry could resume — even after done we don't wipe it.
     expect(stored?.tusUploadUrl).toMatch(/^https:\/\/fake-tus\.local\/upload\//);
 
@@ -318,8 +318,8 @@ describe("drainQueue — resume across a mid-upload network drop (THE FRI-13 acc
     const tus = makeFakeTus(server, hooks);
     const fetchMock = vi.fn(async () => jsonResponse({ mediaId: "m1", duplicate: false }));
 
-    const blob = makeBlob(8_000);
-    const item = await enqueue(makeInput({ blob, bytes: 8_000 }), queueDeps(store));
+    const data = makeData(8_000);
+    const item = await enqueue(makeInput({ data, bytes: 8_000 }), queueDeps(store));
 
     // First drain: the fake server aborts after ~3 KB with a "network drop".
     await drainQueue(makeDeps(store, tus, fetchMock));
@@ -327,8 +327,8 @@ describe("drainQueue — resume across a mid-upload network drop (THE FRI-13 acc
     const midway = await get(item.id, queueDeps(store));
     expect(midway?.status).toBe("failed");
     expect(midway?.lastError).toMatch(/simulated network drop/);
-    // Blob still there so a retry has something to send.
-    expect(midway?.blob).toBeInstanceOf(Blob);
+    // Bytes still there so a retry has something to send.
+    expect(midway?.data).toBeInstanceOf(ArrayBuffer);
     // The URL is the single most important thing — without it, a page reload
     // would POST-create a new upload and lose the ~3 KB we already sent.
     const savedUrl = midway?.tusUploadUrl;
@@ -351,7 +351,7 @@ describe("drainQueue — resume across a mid-upload network drop (THE FRI-13 acc
 
     const final = await get(item.id, queueDeps(store));
     expect(final?.status).toBe("done");
-    expect(final?.blob).toBeNull();
+    expect(final?.data).toBeNull();
     // Same URL — no new POST-create — confirming we actually resumed.
     expect(final?.tusUploadUrl).toBe(savedUrl);
 
@@ -382,14 +382,14 @@ describe("drainQueue — resume across a mid-upload network drop (THE FRI-13 acc
     );
 
     // Seed the row directly to model the "previous session left this behind"
-    // state: status='uploading', persisted tusUploadUrl, blob still present.
-    const blob = makeBlob(6_000);
+    // state: status='uploading', persisted tusUploadUrl, bytes still present.
+    const data = makeData(6_000);
     const url = "https://fake-tus.local/upload/reload-seed";
-    server.createSlot(url, blob.size);
+    server.createSlot(url, data.byteLength);
     server.receive(url, 2_500);
     const rowId = crypto.randomUUID();
     const seeded: UploadItem = {
-      ...makeInput({ blob, bytes: 6_000 }),
+      ...makeInput({ data, bytes: 6_000 }),
       id: rowId,
       status: "uploading",
       progress: 2_500 / 6_000,
@@ -421,7 +421,7 @@ describe("drainQueue — resume across a mid-upload network drop (THE FRI-13 acc
     const tus = makeFakeTus(server, hooks);
     const fetchMock = vi.fn(async () => jsonResponse({ mediaId: "m1", duplicate: false }));
 
-    const item = await enqueue(makeInput({ blob: makeBlob(5_000), bytes: 5_000 }), queueDeps(store));
+    const item = await enqueue(makeInput({ data: makeData(5_000), bytes: 5_000 }), queueDeps(store));
     await drainQueue(makeDeps(store, tus, fetchMock));
 
     // Reload: drop draining flag, rebuild the deps from scratch. The queue
@@ -509,7 +509,7 @@ describe("drainQueue — register is idempotent under lost-response retries", ()
 
     const final = await get(item.id, queueDeps(store));
     expect(final?.status).toBe("done");
-    expect(final?.blob).toBeNull();
+    expect(final?.data).toBeNull();
     // Still exactly ONE row inserted — no double-registration, no phantom row.
     expect(registered.size).toBe(1);
     // The storage object was never re-transferred beyond the file size.
@@ -622,8 +622,8 @@ describe("drainQueue — concurrency + emptiness", () => {
     const tus = makeFakeTus(server, hooks);
     const fetchMock = vi.fn(async () => jsonResponse({ mediaId: "m1", duplicate: false }));
 
-    await enqueue(makeInput({ blob: makeBlob(2_000), bytes: 2_000 }), queueDeps(store));
-    await enqueue(makeInput({ blob: makeBlob(2_000), bytes: 2_000 }), queueDeps(store));
+    await enqueue(makeInput({ data: makeData(2_000), bytes: 2_000 }), queueDeps(store));
+    await enqueue(makeInput({ data: makeData(2_000), bytes: 2_000 }), queueDeps(store));
 
     const deps = makeDeps(store, tus, fetchMock);
     // Fire two drainers at once (load + `online` colliding). The `draining`
@@ -646,7 +646,7 @@ describe("drainQueue — concurrency + emptiness", () => {
     const fetchMock = vi.fn(async () => jsonResponse({ mediaId: "m1", duplicate: false }));
 
     for (let i = 0; i < 3; i++) {
-      await enqueue(makeInput({ blob: makeBlob(1_000), bytes: 1_000 }), queueDeps(store));
+      await enqueue(makeInput({ data: makeData(1_000), bytes: 1_000 }), queueDeps(store));
     }
 
     await drainQueue(makeDeps(store, tus, fetchMock));

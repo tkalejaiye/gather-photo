@@ -99,8 +99,8 @@ function depsFor(store: Map<string, UploadItem>, clock = () => 1_000): Partial<Q
   };
 }
 
-function makeBlob(bytes = 32, byte = 5): Blob {
-  return new Blob([new Uint8Array(bytes).fill(byte)], { type: "image/jpeg" });
+function makeData(bytes = 32, byte = 5): ArrayBuffer {
+  return new Uint8Array(bytes).fill(byte).buffer;
 }
 
 function makeInput(overrides: Partial<EnqueueInput> = {}): EnqueueInput {
@@ -109,7 +109,7 @@ function makeInput(overrides: Partial<EnqueueInput> = {}): EnqueueInput {
     eventSlug: "lagos-wedding-2026",
     uploaderToken: "guest-token-abc",
     uploaderName: "Amaka",
-    blob: makeBlob(),
+    data: makeData(),
     path: "events/lagos-wedding-2026/1234.jpg",
     contentType: "image/jpeg",
     contentHash: "a".repeat(64),
@@ -131,18 +131,18 @@ describe("enqueue", () => {
     expect(item.attempts).toBe(0);
     expect(item.createdAt).toBe(42);
     expect(item.updatedAt).toBe(42);
-    expect(store.get(item.id)?.blob).toBeInstanceOf(Blob);
+    expect(store.get(item.id)?.data).toBeInstanceOf(ArrayBuffer);
   });
 
-  it("stores the compressed blob (not a URL/ref) so reads survive a tab reload", async () => {
+  it("stores the compressed bytes (not a URL/ref) so reads survive a tab reload", async () => {
     const store = makeStore();
-    const blob = makeBlob(128, 7);
-    const item = await enqueue(makeInput({ blob }), depsFor(store));
+    const data = makeData(128, 7);
+    const item = await enqueue(makeInput({ data }), depsFor(store));
 
     // A fresh open() = simulated reload: no in-memory shim state carried over.
     const reloaded = await get(item.id, depsFor(store));
-    expect(reloaded?.blob).toBeInstanceOf(Blob);
-    expect(reloaded?.blob?.size).toBe(128);
+    expect(reloaded?.data).toBeInstanceOf(ArrayBuffer);
+    expect(reloaded?.data?.byteLength).toBe(128);
   });
 });
 
@@ -189,7 +189,7 @@ describe("status transitions are durable", () => {
     expect(again.attempts).toBe(2);
   });
 
-  it("markFailed records the error and keeps the blob for a retry", async () => {
+  it("markFailed records the error and keeps the bytes for a retry", async () => {
     const store = makeStore();
     const item = await enqueue(makeInput(), depsFor(store));
     await claimNext(1, depsFor(store));
@@ -199,7 +199,7 @@ describe("status transitions are durable", () => {
     expect(reloaded?.status).toBe("failed");
     expect(reloaded?.lastError).toBe("network dropped");
     // Bytes stay so drainQueue can pick it up again.
-    expect(reloaded?.blob).toBeInstanceOf(Blob);
+    expect(reloaded?.data).toBeInstanceOf(ArrayBuffer);
   });
 
   it("requeue moves a failed item back to queued and clears the error", async () => {
@@ -215,7 +215,7 @@ describe("status transitions are durable", () => {
     expect(reloaded?.lastError).toBeUndefined();
   });
 
-  it("requeue refuses to resurrect a done item whose blob is gone", async () => {
+  it("requeue refuses to resurrect a done item whose bytes are gone", async () => {
     const store = makeStore();
     const item = await enqueue(makeInput(), depsFor(store));
     await markDone(item.id, depsFor(store));
@@ -224,7 +224,7 @@ describe("status transitions are durable", () => {
     const reloaded = await get(item.id, depsFor(store));
     // Would spin forever without bytes, so it stays done.
     expect(reloaded?.status).toBe("done");
-    expect(reloaded?.blob).toBeNull();
+    expect(reloaded?.data).toBeNull();
   });
 
   it("updatedAt advances on every mutation", async () => {
@@ -279,18 +279,18 @@ describe("query-by-status", () => {
   });
 });
 
-describe("markDone / removal / blob freeing", () => {
-  it("markDone releases the blob but keeps the row durable", async () => {
+describe("markDone / removal / byte freeing", () => {
+  it("markDone releases the bytes but keeps the row durable", async () => {
     const store = makeStore();
-    const item = await enqueue(makeInput({ blob: makeBlob(4096) }), depsFor(store));
+    const item = await enqueue(makeInput({ data: makeData(4096) }), depsFor(store));
     await claimNext(1, depsFor(store));
     await markDone(item.id, depsFor(store));
 
     const reloaded = await get(item.id, depsFor(store));
     expect(reloaded?.status).toBe("done");
     expect(reloaded?.progress).toBe(1);
-    // Blob freed — critical on cheap phones (TECH_SPEC §10).
-    expect(reloaded?.blob).toBeNull();
+    // Bytes freed — critical on cheap phones (TECH_SPEC §10).
+    expect(reloaded?.data).toBeNull();
   });
 
   it("remove() deletes the row entirely", async () => {

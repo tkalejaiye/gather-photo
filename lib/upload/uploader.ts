@@ -219,7 +219,7 @@ async function promoteForRetry(deps: UploaderDeps): Promise<void> {
       // when tus-js-client's Promise never resolves. Always reclaim them.
       .filter(
         (item) =>
-          item.blob !== null &&
+          item.data !== null &&
           (item.status === "uploading" || item.attempts < deps.maxAttempts),
       )
       .map((item) => requeue(item.id, deps.queue)),
@@ -232,8 +232,8 @@ function uploadOne(
   deps: UploaderDeps,
 ): Promise<void> {
   return new Promise<void>((resolve) => {
-    if (!item.blob) {
-      // A row can lose its blob if it reached 'done' between the claim and
+    if (!item.data) {
+      // A row can lose its bytes if it reached 'done' between the claim and
       // this call. Bail cleanly — the item is already terminal.
       resolve();
       return;
@@ -244,7 +244,13 @@ function uploadOne(
     // multiple times on HEAD probes during a resume).
     let lastPersistedUrl = item.tusUploadUrl ?? null;
 
-    const upload = new tus.Upload(item.blob, {
+    // Wrap the raw bytes in a fresh main-thread Blob RIGHT NOW so tus-js-client
+    // hands the fetch layer an in-memory Blob (not a WebKit file-backed one
+    // recovered from IDB). The buffer came out of the queue as a plain
+    // ArrayBuffer, so this Blob is provably backed by heap memory only.
+    const body = new Blob([item.data], { type: item.contentType });
+
+    const upload = new tus.Upload(body, {
       endpoint: deps.tusEndpoint,
       chunkSize: CHUNK_SIZE,
       retryDelays: RETRY_DELAYS,

@@ -1,15 +1,20 @@
 // Durable upload queue backed by IndexedDB.
 //
 // This is the offline half of the "survive a congested venue network" contract
-// (TECH_SPEC §5, §10): guests capture, we enqueue the compressed blob + its
+// (TECH_SPEC §5, §10): guests capture, we enqueue the compressed bytes + their
 // metadata, and every state transition is written to IndexedDB so a tab close,
 // browser crash, or dropped connection mid-upload doesn't lose their photos.
 // The uploader (FRI-13/14) reads from and mutates this queue.
 //
 // Design notes:
-//   - Blob is stored directly in IndexedDB (structured clone), not as a URL.
-//     Object URLs die with the tab; the blob itself persists.
-//   - `blob` is set to null once `status === 'done'` so cheap phones aren't
+//   - Raw ArrayBuffer is stored in IndexedDB, NOT a Blob/File. iOS Safari's
+//     structured clone silently converts stored Blobs/Files to file-backed
+//     objects on retrieval — those work for `.arrayBuffer()` on the main
+//     thread but the fetch layer refuses to include them as a request body
+//     (the PATCH just never leaves the process, tus retries forever, guest
+//     sees "stuck at 0%"). Bytes-as-ArrayBuffer sidesteps that entirely and
+//     the uploader constructs a fresh in-memory Blob at the moment of upload.
+//   - `data` is set to null once `status === 'done'` so cheap phones aren't
 //     holding a full event's worth of compressed images in local storage.
 //   - `idb` is dynamically imported so it never lands in the guest's initial
 //     bundle (TECH_SPEC §8: `/e/[slug]` First Load JS ≤ 110 kB).
@@ -23,8 +28,13 @@ export interface UploadItem {
   eventSlug: string;
   uploaderToken: string;
   uploaderName?: string;
-  /** Compressed image bytes. Set to null once the item reaches 'done'. */
-  blob: Blob | null;
+  /**
+   * Compressed image bytes as a raw ArrayBuffer. Set to null once the item
+   * reaches 'done'. Stored as ArrayBuffer (not Blob/File) because iOS Safari
+   * silently file-backs any Blob written to IDB and then the fetch layer
+   * refuses to include it as a PATCH body — see the file header for context.
+   */
+  data: ArrayBuffer | null;
   /** Target storage object name assigned server-side. */
   path: string;
   contentType: string;
@@ -263,8 +273,8 @@ export async function setTusUploadUrl(
 }
 
 /**
- * Terminal success: mark done, pin progress at 1, and FREE the blob.
- * Freeing the blob is what keeps the on-device queue from growing without
+ * Terminal success: mark done, pin progress at 1, and FREE the bytes.
+ * Freeing the payload is what keeps the on-device queue from growing without
  * bound as the guest keeps shooting (TECH_SPEC §10).
  */
 export async function markDone(
@@ -275,11 +285,11 @@ export async function markDone(
     ...existing,
     status: "done",
     progress: 1,
-    blob: null,
+    data: null,
   }));
 }
 
-/** Terminal failure — keep the blob so the uploader can retry on next drain. */
+/** Terminal failure — keep the bytes so the uploader can retry on next drain. */
 export async function markFailed(
   id: string,
   error?: string,
@@ -299,7 +309,7 @@ export async function requeue(
 ): Promise<void> {
   await mutate(id, overrides, (existing) => {
     // Without bytes we can't upload, so a requeue would spin forever.
-    if (existing.blob === null) return existing;
+    if (existing.data === null) return existing;
     return { ...existing, status: "queued", progress: 0, lastError: undefined };
   });
 }

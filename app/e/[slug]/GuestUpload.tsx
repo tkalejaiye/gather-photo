@@ -363,36 +363,45 @@ export function GuestUpload({
             {pending.map((p) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border bg-white/[0.03] px-4 py-3 text-sm"
+                data-pending-id={p.id}
+                data-pending-state={p.state}
+                className="rounded-2xl border bg-white/[0.03] px-4 py-3 text-sm"
                 style={{ borderColor: "rgba(255,255,255,0.06)" }}
               >
-                <span className="min-w-0 flex-1 truncate text-white">
-                  {p.fileName}
-                </span>
-                <span className="shrink-0 text-xs text-ink-300">
-                  {formatBytes(p.fileSize)}
-                </span>
-                {p.state === "compressing" ? (
-                  <span className="shrink-0 animate-pulse-soft text-xs text-plum-200">
-                    Preparing…
+                <div className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 flex-1 truncate text-white">
+                    {p.fileName}
                   </span>
-                ) : (
-                  <span
-                    className="shrink-0 text-xs text-red-300"
-                    title={p.error}
-                  >
-                    Failed
+                  <span className="shrink-0 text-xs text-ink-300">
+                    {formatBytes(p.fileSize)}
                   </span>
-                )}
-                {p.state === "error" ? (
-                  <button
-                    type="button"
-                    onClick={() => removePending(p.id)}
-                    aria-label={`Remove ${p.fileName}`}
-                    className="shrink-0 rounded-pill px-2 py-1 text-xs text-ink-300 transition hover:text-white"
+                  {p.state === "compressing" ? (
+                    <span className="shrink-0 animate-pulse-soft text-xs text-plum-200">
+                      Preparing…
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-xs text-red-300">
+                      Failed
+                    </span>
+                  )}
+                  {p.state === "error" ? (
+                    <button
+                      type="button"
+                      onClick={() => removePending(p.id)}
+                      aria-label={`Remove ${p.fileName}`}
+                      className="shrink-0 rounded-pill px-2 py-1 text-xs text-ink-300 transition hover:text-white"
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                {p.state === "error" && p.error ? (
+                  <p
+                    data-error-detail=""
+                    className="mt-2 break-words text-xs text-red-300"
                   >
-                    Remove
-                  </button>
+                    {p.error}
+                  </p>
                 ) : null}
               </li>
             ))}
@@ -442,6 +451,14 @@ export function GuestUpload({
                       }}
                     />
                   </div>
+                ) : null}
+                {item.status === "failed" && item.lastError ? (
+                  <p
+                    data-error-detail=""
+                    className="mt-2 break-words text-xs text-red-300"
+                  >
+                    {item.lastError}
+                  </p>
                 ) : null}
               </li>
             ))}

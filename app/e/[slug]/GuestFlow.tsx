@@ -38,6 +38,14 @@ const NAME_KEY = "gp_uploader_name";
 /** How often to re-read the queue while there are non-terminal items. */
 const POLL_MS = 400;
 
+/**
+ * How long failed rows keep their calm "waiting" presentation after the
+ * network returns. The engine's `online` drain requeues them within ~a
+ * second; flashing red FAILED in that gap reads like the recovery didn't
+ * work. A genuine failure outlives this window and shows red + Retry.
+ */
+const RECONNECT_GRACE_MS = 4000;
+
 type Screen = "landing" | "name" | "picker" | "uploading" | "success";
 
 /**
@@ -173,6 +181,10 @@ export function GuestFlow({
   // from older sessions stay in IndexedDB but out of the UI.
   const [batchIds, setBatchIds] = useState<string[]>([]);
   const [offline, setOffline] = useState(false);
+  // True from the `online` event until the engine has requeued the rows that
+  // failed while offline (or RECONNECT_GRACE_MS passes) — see maskFailures.
+  const [reconnectGrace, setReconnectGrace] = useState(false);
+  const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tokenRef = useRef<string | null>(null);
   // Pick-time object URLs for thumbnails, keyed by item id. Gone after a
   // reload — rows fall back to placeholder gradients.
@@ -263,6 +275,15 @@ export function GuestFlow({
     // automatically" promise without waiting for a visibility change.
     function onOnline() {
       setOffline(false);
+      // Hold the calm presentation through the reconnect handoff — the
+      // effect below drops it as soon as the requeue lands, the timer is
+      // the cap for rows the engine declines to requeue.
+      setReconnectGrace(true);
+      if (graceTimerRef.current) clearTimeout(graceTimerRef.current);
+      graceTimerRef.current = setTimeout(
+        () => setReconnectGrace(false),
+        RECONNECT_GRACE_MS,
+      );
       void kickDrain();
     }
     function onOffline() {
@@ -274,6 +295,7 @@ export function GuestFlow({
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
+      if (graceTimerRef.current) clearTimeout(graceTimerRef.current);
     };
   }, [kickDrain]);
 
@@ -292,23 +314,52 @@ export function GuestFlow({
     pending.some((p) => p.state === "compressing") ||
     items.some((i) => i.status === "queued" || i.status === "uploading");
 
-  useEffect(() => {
-    // Poll while there's non-terminal work. Cheap enough on IDB, and it means
-    // the uploader doesn't need a pub/sub API into this component. We stop
-    // when the queue settles so an idle tab doesn't churn.
-    if (!hasWork) return;
-    const t = setInterval(() => {
-      void refreshItems();
-    }, POLL_MS);
-    return () => clearInterval(t);
-  }, [hasWork, refreshItems]);
-
   const batchSet = new Set(batchIds);
   const batchItems = items.filter((i) => batchSet.has(i.id));
   const compressingCount = pending.filter((p) => p.state === "compressing").length;
   const trayCount = pending.length + batchItems.length;
   // What "Add N shots" actually adds — compress-failed picks don't count.
   const addableCount = compressingCount + batchItems.length;
+
+  const failedItemCount = batchItems.filter((i) => i.status === "failed").length;
+  const pendingErrorCount = pending.filter((p) => p.state === "error").length;
+  const failedCount = failedItemCount + pendingErrorCount;
+  const allDone =
+    batchItems.length > 0 &&
+    pending.length === 0 &&
+    batchItems.every((i) => i.status === "done");
+
+  // Failed queue rows read as calmly "waiting" while offline and through the
+  // reconnect grace window — the engine auto-requeues them on `online`, so
+  // red FAILED + a dead Retry button would misdescribe both states. Genuine
+  // failures outlive the grace and show red. Compress errors (pending) are
+  // never network-caused and are never masked.
+  const maskFailures = offline || reconnectGrace;
+  const visibleFailedCount =
+    (maskFailures ? 0 : failedItemCount) + pendingErrorCount;
+
+  useEffect(() => {
+    // Poll while there's non-terminal work — and on the progress screen,
+    // until the batch is actually finished. The wider condition matters
+    // after a reconnect: rows sit in `failed` (hasWork false) while the
+    // engine's own drain requeues them, and without polling the view would
+    // stay stuck on stale failures while uploads proceed underneath.
+    // Cheap enough on IDB, and it means the uploader doesn't need a pub/sub
+    // API into this component.
+    const shouldPoll = hasWork || (screen === "uploading" && !allDone);
+    if (!shouldPoll) return;
+    const t = setInterval(() => {
+      void refreshItems();
+    }, POLL_MS);
+    return () => clearInterval(t);
+  }, [hasWork, screen, allDone, refreshItems]);
+
+  useEffect(() => {
+    // Drop the reconnect grace as soon as no failed rows remain (the requeue
+    // landed); the RECONNECT_GRACE_MS timer caps the rows that the engine
+    // declined to requeue (attempts exhausted).
+    if (reconnectGrace && failedItemCount === 0) setReconnectGrace(false);
+  }, [reconnectGrace, failedItemCount]);
 
   // Aggregate progress across the batch for the ring + linear bar.
   const progressDenominator = compressingCount + batchItems.length;
@@ -320,14 +371,6 @@ export function GuestFlow({
     progressDenominator === 0
       ? 0
       : Math.round((progressSum / progressDenominator) * 100);
-
-  const failedCount =
-    batchItems.filter((i) => i.status === "failed").length +
-    pending.filter((p) => p.state === "error").length;
-  const allDone =
-    batchItems.length > 0 &&
-    pending.length === 0 &&
-    batchItems.every((i) => i.status === "done");
 
   useEffect(() => {
     // Auto-advance to Success ONLY once every batch item has completed
@@ -675,7 +718,7 @@ export function GuestFlow({
                 ? "All in!"
                 : offline
                   ? "Waiting for network…"
-                  : failedCount > 0 && !hasWork
+                  : visibleFailedCount > 0 && !hasWork
                     ? "Some shots need a retry"
                     : "Adding your shots…"}
             </h1>
@@ -686,7 +729,7 @@ export function GuestFlow({
                   // engine auto-requeues on `online` — say so instead of asking
                   // for a manual retry that isn't needed.
                   "Your shots are saved on this phone — they'll retry on their own once you're back online."
-                : failedCount > 0 && !hasWork
+                : visibleFailedCount > 0 && !hasWork
                   ? "Check the errors below — nothing is lost."
                   : "Hang tight — landing in the roll."}
             </p>
@@ -760,19 +803,13 @@ export function GuestFlow({
               ))}
 
               {batchItems.map((item, i) => (
-                // While hard-offline, a 'failed' row is not what it means: the
-                // engine auto-requeues failed items on `online`, and Retry is a
-                // dead button (drainQueue refuses to start offline). Present
-                // those rows as calmly waiting; genuine failures resurface in
-                // red — with error text and Retry — once we're back online and
-                // the auto-retry has actually had a chance to fail.
                 <li
                   key={item.id}
                   data-item-id={item.id}
                   data-status={item.status}
                   className={cx(
                     "flex items-center gap-3 rounded-daylight-card border bg-white/50 p-3",
-                    item.status === "failed" && !offline
+                    item.status === "failed" && !maskFailures
                       ? "border-daylight-red/40"
                       : "border-daylight-rule-light",
                   )}
@@ -790,10 +827,10 @@ export function GuestFlow({
                         </span>
                       </span>
                       <span className="flex shrink-0 items-center gap-2">
-                        <QueueBadge item={item} offline={offline} />
+                        <QueueBadge item={item} masked={maskFailures} />
                         {item.status === "failed" ? (
                           <>
-                            {!offline ? (
+                            {!maskFailures ? (
                               <button
                                 type="button"
                                 onClick={() => retryItem(item.id)}
@@ -823,7 +860,7 @@ export function GuestFlow({
                         />
                       </div>
                     ) : null}
-                    {item.status === "failed" && item.lastError && !offline ? (
+                    {item.status === "failed" && item.lastError && !maskFailures ? (
                       <p
                         data-error-detail=""
                         className="mt-1 break-words font-mono text-[11px] text-daylight-red-deep"
@@ -1039,7 +1076,7 @@ function ItemThumb({
   );
 }
 
-function QueueBadge({ item, offline }: { item: UploadItem; offline: boolean }) {
+function QueueBadge({ item, masked }: { item: UploadItem; masked: boolean }) {
   switch (item.status) {
     case "queued":
       return (
@@ -1060,11 +1097,11 @@ function QueueBadge({ item, offline }: { item: UploadItem; offline: boolean }) {
         </span>
       );
     case "failed":
-      // Offline, 'failed' just means "the network went away mid-transfer" —
-      // deliberately not phrased as a promise of auto-retry, since an item
-      // that exhausted MAX_ATTEMPTS reverts to a red Failed (+ Retry) once
-      // we're back online instead of resuming on its own.
-      return offline ? (
+      // Masked (offline or reconnect grace), 'failed' just means "the network
+      // went away mid-transfer" — deliberately not phrased as a promise of
+      // auto-retry, since an item that exhausted MAX_ATTEMPTS reverts to a
+      // red Failed (+ Retry) after the grace instead of resuming on its own.
+      return masked ? (
         <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-daylight-muted">
           Waiting
         </span>

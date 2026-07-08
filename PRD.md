@@ -50,7 +50,7 @@ Native iOS/Android apps · iOS App Clips · video transcoding/streaming · AI fa
 
 ## 7. Functional requirements
 
-1. **Event creation** — host auth (email/phone OTP), create event, unguessable slug, optional PIN, upload window + storage expiry.
+1. **Event creation** — host auth (email magic link + Google OAuth), create event, unguessable slug, optional PIN, upload window + storage expiry.
 2. **Guest upload (critical path)** — no-login web page; camera capture or multi-select; **client-side compression**; **offline-first queue (IndexedDB)**; **resumable uploads (TUS)** with retry/backoff; visible per-item + overall progress.
 3. **Host gallery** — grid view, uploader attribution, delete/moderation, **one-click ZIP download** in original (uploaded) quality.
 4. **Payments** — Paystack checkout in naira (card/Verve, bank transfer, USSD); webhook-confirmed activation; tiered by guest band.

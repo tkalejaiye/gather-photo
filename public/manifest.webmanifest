@@ -4,8 +4,8 @@
   "description": "Every guest's photos at your event, in one place.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#6C3FB5",
+  "background_color": "#F4E9CE",
+  "theme_color": "#F4E9CE",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }

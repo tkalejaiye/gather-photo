@@ -1,14 +1,18 @@
 import { cx } from "./cx";
 
 type WordmarkProps = {
-  /** "ink" on paper (default); "white" on the orange brand panel. */
-  tone?: "ink" | "white";
+  /**
+   * "ink" on paper (default); "white" on the orange brand panel; "paper" on
+   * dark ink surfaces (host dashboard sidebar, D4).
+   */
+  tone?: "ink" | "white" | "paper";
   className?: string;
 };
 
 // The brand is set type, no raster asset: ◉ badge + "GATHER.PHOTO" in
 // Archivo Black. On paper the ".PHOTO" goes orange; on the orange panel the
-// whole mark is white with a translucent badge.
+// whole mark is white with a translucent badge; on ink the type is paper
+// with ".PHOTO" in the lighter orange.
 export function Wordmark({ tone = "ink", className }: WordmarkProps) {
   const onOrange = tone === "white";
   return (
@@ -27,11 +31,20 @@ export function Wordmark({ tone = "ink", className }: WordmarkProps) {
       <span
         className={cx(
           "font-display tracking-[0.02em]",
-          onOrange ? "text-xl text-white" : "text-[17px] text-daylight-ink",
+          onOrange && "text-xl text-white",
+          tone === "ink" && "text-[17px] text-daylight-ink",
+          tone === "paper" && "text-[15px] text-daylight-paper",
         )}
       >
         GATHER
-        <span className={onOrange ? undefined : "text-daylight-orange"}>.PHOTO</span>
+        <span
+          className={cx(
+            tone === "ink" && "text-daylight-orange",
+            tone === "paper" && "text-daylight-orange-hi",
+          )}
+        >
+          .PHOTO
+        </span>
       </span>
     </div>
   );

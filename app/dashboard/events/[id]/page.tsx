@@ -2,6 +2,13 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { createClient } from "@/lib/supabase/server";
+import { backButtonClasses } from "@/components/ui/back-button";
+import { daylightButtonClasses } from "@/components/ui/button";
+import { cx } from "@/components/ui/cx";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { ScreenShell } from "@/components/ui/screen-shell";
+import { Wordmark } from "@/components/ui/wordmark";
+import { statusLine } from "../../status";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { GalleryGrid } from "./GalleryGrid";
 import {
@@ -17,6 +24,13 @@ export const metadata = { title: "Event · gather.photo" };
 // is host-only and low-traffic.
 export const dynamic = "force-dynamic";
 
+// "Roll Control" — Daylight screen 13 on mobile, desktop anchor D4 (dark ink
+// sidebar + 320px share/stats column + Recent uploads pane) at lg and up.
+// Overrides vs the mock (FRI-36 decision log): stats are SHOTS + CROWD only
+// (no view tracking → no LOOKS), the ZIP download stays prominent (PRD §7),
+// and moderation keeps the FRI-17 delete flow — the mock's tap-to-hide
+// overlay becomes the FRI-30 approval UI, not this.
+
 export default async function EventDetailPage({
   params,
 }: {
@@ -31,7 +45,7 @@ export default async function EventDetailPage({
   // RLS scopes this select to the host's own events.
   const { data: event } = await supabase
     .from("events")
-    .select("id, name, slug, pin, event_date, status, created_at")
+    .select("id, name, slug, pin, event_date, status, uploads_close_at, created_at")
     .eq("id", params.id)
     .maybeSingle();
   if (!event) notFound();
@@ -53,6 +67,7 @@ export default async function EventDetailPage({
     }
   }
   const guestUrl = `${appUrl ?? "http://localhost:3000"}/e/${event.slug}`;
+  const guestUrlDisplay = guestUrl.replace(/^https?:\/\//, "");
   // Server-rendered QR keeps the host bundle free of the qrcode package.
   // Error-correction M = ~15% damage tolerance — enough for print at A6.
   const qrDataUrl = await QRCode.toDataURL(guestUrl, {
@@ -61,75 +76,182 @@ export default async function EventDetailPage({
     width: 320,
   });
 
-  const isOpen = event.status === "open";
+  const isLive = event.status === "active";
+  const line = statusLine(event.status, event.uploads_close_at);
 
   return (
-    <main className="app-shell min-h-screen px-6 py-10">
-      <div className="mx-auto max-w-5xl">
-        <Link
-          href="/dashboard"
-          className="h-eyebrow inline-flex items-center gap-1 text-ink-300 transition hover:text-white"
-        >
-          ← All events
-        </Link>
-        <header className="mt-5 flex flex-wrap items-baseline justify-between gap-3">
-          <div>
-            <p className="h-eyebrow">Event</p>
-            <h1 className="h-display mt-1 text-4xl sm:text-5xl">{event.name}</h1>
-            <p className="mt-2 text-sm text-ink-200">
-              {event.event_date ?? "No date set"}
+    <ScreenShell contentClassName="lg:flex-row">
+      {/* D4 sidebar — dark ink, wordmark, Events nav, pinned current event. */}
+      <aside className="hidden bg-daylight-ink px-5 py-7 lg:flex lg:w-[244px] lg:shrink-0 lg:flex-col">
+        <Wordmark tone="paper" />
+        <nav className="mt-9 flex flex-col gap-1" aria-label="Dashboard">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3 rounded-[11px] px-3.5 py-3 text-sm font-bold text-[#b7a988] transition hover:bg-white/[0.06] hover:text-daylight-paper"
+          >
+            <span aria-hidden>▦</span> Events
+          </Link>
+          <span
+            aria-current="page"
+            className="flex items-center gap-3 rounded-[11px] bg-daylight-orange-grad px-3.5 py-3 text-sm font-bold text-white"
+          >
+            <span aria-hidden>▨</span> Overview
+          </span>
+        </nav>
+        <div className="flex-1" />
+        <div className="rounded-[13px] bg-white/[0.07] p-4">
+          <div className="font-mono text-[11px] tracking-[0.1em] text-daylight-muted">
+            CURRENT EVENT
+          </div>
+          <div className="mt-1.5 break-words font-display text-sm leading-snug text-daylight-paper">
+            {event.name}
+          </div>
+          <div className="mt-1 font-mono text-[11px] text-[#b7a988]">{line}</div>
+        </div>
+      </aside>
+
+      <main className="mx-auto w-full max-w-[1060px] flex-1 px-[22px] pb-12 pt-14 lg:px-9 lg:pt-[34px]">
+        {/* Mobile top row: back + eyebrow (mock screen 13). */}
+        <div className="flex items-center justify-between lg:hidden">
+          <Link
+            href="/dashboard"
+            aria-label="Back to your events"
+            className={backButtonClasses()}
+          >
+            ←
+          </Link>
+          <Eyebrow>ROLL CONTROL</Eyebrow>
+        </div>
+
+        <header className="mt-5 flex items-start justify-between gap-4 lg:mt-0">
+          <div className="min-w-0">
+            <Eyebrow className="hidden items-center gap-2.5 lg:flex">
+              {isLive && (
+                <span
+                  aria-hidden
+                  className="h-2 w-2 animate-gp-blink rounded-full bg-daylight-orange shadow-[0_0_8px_rgba(255,106,0,0.7)]"
+                />
+              )}
+              ROLL CONTROL{isLive ? " · LIVE" : ""}
+            </Eyebrow>
+            <h1 className="mt-2 break-words font-display text-[30px] uppercase leading-[0.95] tracking-[0.005em] text-daylight-ink lg:mt-2 lg:text-[38px]">
+              {event.name}
+            </h1>
+            <p className="mt-2 font-mono text-[13px] text-daylight-muted">
+              {line}
               {event.pin ? " · PIN required" : ""}
             </p>
           </div>
-          <span
-            className={isOpen ? "chip chip-active" : "chip"}
-            aria-label={`Status: ${event.status}`}
+          <Link
+            href={`/e/${event.slug}`}
+            className="hidden shrink-0 items-center gap-1.5 rounded-[12px] bg-daylight-orange-grad px-5 py-3 font-display text-[13px] uppercase text-white shadow-[0_10px_24px_rgba(255,106,0,0.32)] transition active:scale-[0.97] lg:inline-flex"
           >
-            {event.status}
-          </span>
+            View live roll ↗
+          </Link>
         </header>
 
-        <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
-          <section className="card">
-            <p className="h-eyebrow">Guest link</p>
-            <h2 className="mt-1 text-lg font-semibold text-white">
-              Share this to collect photos
-            </h2>
-            <p className="mt-1 text-xs text-ink-300">
-              Anyone with this link can upload photos.
-              {event.pin ? " They will also need the PIN." : ""}
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded-2xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-white">
-                {guestUrl}
-              </code>
-              <CopyLinkButton url={guestUrl} />
-            </div>
-          </section>
+        <div className="mt-6 lg:flex lg:items-start lg:gap-[22px]">
+          {/* Left column: share card, stats, ZIP (D4); stacks first on mobile. */}
+          <div className="flex flex-col gap-3.5 lg:w-[320px] lg:shrink-0">
+            <section
+              aria-label="Guest link"
+              className="flex items-center gap-4 rounded-daylight-card-lg border border-daylight-rule bg-white/55 p-[18px] shadow-daylight-card lg:flex-col lg:gap-0 lg:border-daylight-rule-light lg:bg-white lg:p-[22px] lg:text-center"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={qrDataUrl}
+                alt={`QR code for ${guestUrl}`}
+                width={320}
+                height={320}
+                className="h-[108px] w-[108px] shrink-0 rounded-[12px] bg-white p-2 shadow-daylight-card-sm lg:h-[170px] lg:w-[170px] lg:p-3"
+              />
+              <div className="min-w-0 flex-1 lg:mt-4 lg:w-full lg:flex-none">
+                <div className="font-mono text-[10px] font-bold tracking-[0.12em] text-daylight-muted lg:text-[11px]">
+                  GUEST LINK
+                </div>
+                <div className="mt-1.5 break-all font-mono text-sm font-bold text-daylight-ink lg:text-[15px]">
+                  {guestUrlDisplay}
+                </div>
+                <CopyLinkButton url={guestUrl} className="mt-3 lg:w-full lg:py-3" />
+              </div>
+            </section>
 
-          <section className="card flex flex-col items-center text-center">
-            <p className="h-eyebrow">QR code</p>
-            <p className="mt-1 max-w-[220px] text-xs text-ink-300">
-              Print for signage — guests scan with their phone camera.
-            </p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={qrDataUrl}
-              alt={`QR code for ${guestUrl}`}
-              width={240}
-              height={240}
-              className="mt-3 h-56 w-56 rounded-2xl bg-white p-3 shadow-plum"
+            <div className="flex gap-2.5">
+              <StatCard value={mediaCount} label="SHOTS" accent />
+              <StatCard value={uploaders.length} label="CROWD" />
+            </div>
+
+            {mediaCount > 0 && (
+              /* FRI-18: streamed ZIP export. A plain <a> beats fetch()+Blob
+                 because the browser can spool multi-GB responses to disk
+                 as they arrive, whereas Blob buffers the whole payload. */
+              <a
+                href={`/api/events/${event.id}/download`}
+                className={daylightButtonClasses("secondary", "w-full")}
+                aria-label="Download all photos as ZIP"
+              >
+                ⬇ DOWNLOAD ZIP
+              </a>
+            )}
+          </div>
+
+          {/* Right pane: Recent uploads moderation grid (D4). */}
+          <section className="mt-7 lg:mt-0 lg:min-w-0 lg:flex-1 lg:self-start lg:rounded-daylight-card-lg lg:border lg:border-daylight-rule-light lg:bg-white/50 lg:p-[22px] lg:shadow-daylight-card-sm">
+            <GalleryGrid
+              eventId={event.id}
+              totalCount={mediaCount}
+              uploaders={uploaders}
+              initialPage={initialPage}
             />
           </section>
         </div>
 
-        <GalleryGrid
-          eventId={event.id}
-          totalCount={mediaCount}
-          uploaders={uploaders}
-          initialPage={initialPage}
-        />
+        {/* Mobile footer (mock screen 13). */}
+        <div className="mt-8 lg:hidden">
+          <Link
+            href={`/e/${event.slug}`}
+            className={daylightButtonClasses("secondary", "w-full")}
+          >
+            VIEW LIVE ROLL
+          </Link>
+        </div>
+      </main>
+    </ScreenShell>
+  );
+}
+
+// Compact so a 1,400-shot wedding reads "1.4k" like the mock, not a
+// four-digit pile-up in a 26px face.
+function formatCount(n: number): string {
+  if (n < 1000) return String(n);
+  return new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  })
+    .format(n)
+    .toLowerCase();
+}
+
+function StatCard({
+  value,
+  label,
+  accent = false,
+}: {
+  value: number;
+  label: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex-1 rounded-daylight-card border border-daylight-rule bg-white/50 p-4">
+      <div
+        className={cx(
+          "font-display text-[26px]",
+          accent ? "text-daylight-orange" : "text-daylight-ink",
+        )}
+      >
+        {formatCount(value)}
       </div>
-    </main>
+      <div className="mt-1 font-mono text-[11px] text-daylight-muted">{label}</div>
+    </div>
   );
 }

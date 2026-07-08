@@ -697,22 +697,6 @@ export function GuestFlow({
           className="flex flex-1 animate-gp-fade flex-col items-center px-[26px] pb-11 pt-10 text-center"
         >
           <div className="flex w-full flex-1 flex-col items-center justify-center py-6">
-            <div className="relative mb-9 h-[150px] w-[150px]">
-              <div className="absolute inset-0 rounded-full border-8 border-daylight-ink/[0.08]" />
-              <div
-                className={cx(
-                  "absolute inset-0 rounded-full border-8 border-transparent [border-right-color:#FF8A1E] [border-top-color:#FF6A00]",
-                  hasWork && "animate-gp-spin",
-                )}
-              />
-              <div
-                className="absolute inset-0 flex items-center justify-center font-display text-[34px] text-daylight-ink"
-                aria-live="polite"
-              >
-                {overallPct}%
-              </div>
-            </div>
-
             <h1 className="font-display text-[26px] text-daylight-ink">
               {allDone
                 ? "All in!"
@@ -740,6 +724,12 @@ export function GuestFlow({
                 style={{ width: `${overallPct}%` }}
               />
             </div>
+            <p
+              className="mt-2 font-mono text-xs font-bold text-daylight-ink"
+              aria-live="polite"
+            >
+              {overallPct}%
+            </p>
 
             {hasWork || (offline && failedCount > 0) ? (
               // TECH_SPEC §8 + PRD §7: iOS pauses background JS. Uploads

@@ -17,6 +17,11 @@ import type { GalleryItem, GalleryPage, UploaderSummary } from "@/lib/gallery/qu
 // - Tap a thumbnail for full-size lightbox
 // - Select mode: multi-select + delete N; single-item delete inside the lightbox
 //
+// FRI-36 restyled this in Daylight ("Recent uploads" pane of D4 / the mobile
+// Moderate grid): tiles are polaroid prints with uploader-name chins, the
+// lightbox is the D3 dark-scrim treatment. Behavior is unchanged; the ZIP
+// download moved up to the page's share/stats column (PRD §7 prominence).
+//
 // Kept as a lean client component: no state manager, no image lib. The initial
 // page is server-rendered so first paint shows photos immediately; subsequent
 // pages arrive via /api/events/[id]/media.
@@ -315,41 +320,32 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
   );
 
   return (
-    <section className="mt-10">
+    <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="h-eyebrow">The roll</p>
-          <h2 className="h-display mt-1 text-3xl">
-            {filter === "all"
-              ? `${visibleTotal} ${visibleTotal === 1 ? "photo" : "photos"}`
-              : `${filterTotal} of ${visibleTotal}`}
+          <h2 className="font-display text-[15px] uppercase tracking-[0.02em] text-daylight-ink">
+            Recent uploads
           </h2>
+          <p className="mt-1 font-mono text-xs text-daylight-muted">
+            {filter === "all"
+              ? `${visibleTotal} ${visibleTotal === 1 ? "shot" : "shots"} in the roll`
+              : `${filterTotal} of ${visibleTotal}`}
+          </p>
         </div>
         {visibleTotal > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            {/* FRI-18: streamed ZIP export. A plain <a> beats fetch()+Blob
-                because the browser can spool multi-GB responses to disk
-                as they arrive, whereas Blob buffers the whole payload. */}
-            <a
-              href={`/api/events/${eventId}/download`}
-              className="btn-ghost !px-4 !py-2 text-xs"
-              aria-label="Download all photos as ZIP"
-            >
-              ⬇ Download all
-            </a>
-            <button
-              type="button"
-              onClick={toggleSelectMode}
-              className={
-                selectMode
-                  ? "btn-plum !px-4 !py-2 text-xs"
-                  : "btn-ghost !px-4 !py-2 text-xs"
-              }
-              aria-pressed={selectMode}
-            >
-              {selectMode ? "Cancel" : "Select"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={toggleSelectMode}
+            className={
+              "rounded-daylight-chip px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.06em] transition active:scale-[0.95] " +
+              (selectMode
+                ? "bg-daylight-orange-grad text-white"
+                : "border border-daylight-rule bg-white/60 text-daylight-ink-soft")
+            }
+            aria-pressed={selectMode}
+          >
+            {selectMode ? "Cancel" : "Select"}
+          </button>
         )}
       </div>
 
@@ -384,28 +380,29 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       )}
 
       {items.length === 0 && !loading ? (
-        <div className="card mt-6 text-center">
+        <div className="mt-5 rounded-daylight-card border border-daylight-rule bg-white/50 p-6 text-center">
           <p className="text-2xl">🎬</p>
-          <p className="mt-2 text-sm text-ink-200">
+          <p className="mt-2 text-sm text-daylight-ink-soft">
             {filter === "all"
               ? "No photos yet. Share the guest link to start collecting."
               : "No photos from this uploader."}
           </p>
         </div>
       ) : (
-        <ul className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <ul className="mt-4 grid grid-cols-3 gap-2 md:grid-cols-4 lg:gap-3">
           {items.map((item, index) => {
             const isSelected = selected.has(item.id);
             return (
               <li key={item.id}>
+                {/* Polaroid print: white frame, photo, uploader-name chin. */}
                 <button
                   type="button"
                   onClick={() => onThumbClick(item.id, index)}
                   aria-pressed={selectMode ? isSelected : undefined}
                   className={
-                    "group relative block aspect-square w-full overflow-hidden rounded-2xl bg-ink-800 transition focus:outline-none focus:ring-2 focus:ring-pop-400" +
+                    "group relative block w-full rounded-[4px] bg-white p-[5px] pb-1.5 text-left shadow-[0_4px_10px_rgba(90,70,30,0.14)] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-daylight-orange" +
                     (selectMode && isSelected
-                      ? " ring-2 ring-pop-400 ring-offset-2 ring-offset-ink"
+                      ? " ring-2 ring-daylight-orange"
                       : "")
                   }
                   aria-label={
@@ -418,25 +415,30 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
                         : "Photo by a guest"
                   }
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.url}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className={
-                      "h-full w-full object-cover transition duration-200 group-hover:scale-[1.02] group-hover:opacity-95" +
-                      (selectMode && isSelected ? " opacity-70" : "")
-                    }
-                  />
+                  <span className="block aspect-square overflow-hidden rounded-[2px] bg-daylight-paper-edge">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.url}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className={
+                        "h-full w-full object-cover transition duration-200 group-hover:scale-[1.02]" +
+                        (selectMode && isSelected ? " opacity-70" : "")
+                      }
+                    />
+                  </span>
+                  <span className="mt-1 block truncate px-0.5 font-mono text-[10px] font-bold text-daylight-muted">
+                    {item.uploaderName ?? "Anonymous"}
+                  </span>
                   {selectMode && (
                     <span
                       aria-hidden="true"
                       className={
                         "absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shadow " +
                         (isSelected
-                          ? "bg-pop-gradient text-white"
-                          : "border border-white/40 bg-black/50 text-white/70 backdrop-blur")
+                          ? "bg-daylight-orange-grad text-white"
+                          : "border border-daylight-rule bg-white/80 text-daylight-muted")
                       }
                     >
                       {isSelected ? "✓" : ""}
@@ -450,12 +452,12 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       )}
 
       {error && (
-        <div className="banner-error mt-5 flex items-center gap-3">
+        <div className="mt-5 flex items-center gap-3 rounded-daylight-field border border-daylight-red/50 bg-daylight-red/10 px-4 py-3 text-sm text-daylight-red-deep">
           <span className="flex-1">{error}</span>
           <button
             type="button"
             onClick={() => nextOffset !== null && fetchPage(nextOffset, filter, "append")}
-            className="rounded-pill border border-red-400/40 px-3 py-1 text-xs font-semibold text-red-100 hover:border-red-300"
+            className="rounded-daylight-chip border border-daylight-red/50 px-3 py-1 font-mono text-xs font-bold text-daylight-red-deep transition hover:bg-daylight-red/10"
           >
             Retry
           </button>
@@ -463,7 +465,10 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       )}
 
       {deleteError && (
-        <div role="alert" className="banner-error mt-5">
+        <div
+          role="alert"
+          className="mt-5 rounded-daylight-field border border-daylight-red/50 bg-daylight-red/10 px-4 py-3 text-sm text-daylight-red-deep"
+        >
           {deleteError}
         </div>
       )}
@@ -471,7 +476,7 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       {hasMore && (
         <div
           ref={sentinelRef}
-          className="mt-6 flex items-center justify-center py-6 text-xs text-ink-300"
+          className="mt-6 flex items-center justify-center py-6 font-mono text-xs text-daylight-muted"
           aria-hidden={!hasMore}
         >
           {loading ? "Loading more…" : "Scroll for more"}
@@ -484,8 +489,8 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
           aria-label="Selection actions"
           className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4"
         >
-          <div className="pointer-events-auto flex items-center gap-3 rounded-pill border border-white/10 bg-ink-800/95 px-4 py-2 shadow-plum backdrop-blur">
-            <span className="text-xs font-medium text-ink-100">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-[13px] border border-daylight-rule bg-daylight-paper/95 px-4 py-2.5 shadow-daylight-card backdrop-blur">
+            <span className="font-mono text-xs font-bold text-daylight-ink-soft">
               {selected.size === 0
                 ? "Tap photos to select"
                 : `${selected.size} selected`}
@@ -494,14 +499,14 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
               type="button"
               onClick={onDeleteSelected}
               disabled={selected.size === 0 || deleting}
-              className="rounded-pill bg-red-500 px-3 py-1 text-xs font-semibold text-white shadow transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-ink-300"
+              className="rounded-[9px] bg-daylight-red px-3 py-1.5 font-mono text-xs font-bold text-white shadow transition hover:brightness-105 disabled:cursor-not-allowed disabled:bg-daylight-ink/10 disabled:text-daylight-muted"
             >
               {deleting ? "Deleting…" : `Delete${selected.size ? ` ${selected.size}` : ""}`}
             </button>
             <button
               type="button"
               onClick={toggleSelectMode}
-              className="rounded-pill border border-white/15 px-3 py-1 text-xs text-white transition hover:bg-white/[0.06]"
+              className="rounded-[9px] border border-daylight-rule px-3 py-1.5 font-mono text-xs text-daylight-ink transition hover:bg-white/60"
             >
               Cancel
             </button>
@@ -548,10 +553,15 @@ function FilterPill({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={active ? "chip chip-active" : "chip"}
+      className={
+        "rounded-daylight-chip px-2.5 py-1 font-mono text-[11px] font-bold transition active:scale-[0.95] " +
+        (active
+          ? "bg-daylight-orange-grad text-white"
+          : "border border-daylight-rule bg-white/60 text-daylight-ink-soft")
+      }
     >
       {label}
-      <span className={active ? "ml-1 text-white/80" : "ml-1 text-ink-300"}>
+      <span className={active ? "ml-1 text-white/80" : "ml-1 text-daylight-muted"}>
         {count}
       </span>
     </button>
@@ -578,12 +588,14 @@ function Lightbox({
     if (ev.key === "Enter" || ev.key === " ") onClose();
   }
 
+  // D3 lightbox treatment: dark ink scrim over the paper, the photo as a
+  // large white print, paper-toned metadata.
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-label={item.uploaderName ? `Photo by ${item.uploaderName}` : "Photo"}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(24,16,6,0.86)] p-4 backdrop-blur-sm"
       onClick={onClose}
       onKeyDown={onBackdropKey}
       tabIndex={-1}
@@ -592,17 +604,19 @@ function Lightbox({
         className="relative flex max-h-full max-w-full flex-col items-center"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={item.url}
-          alt={item.uploaderName ? `Photo by ${item.uploaderName}` : "Photo"}
-          className="max-h-[82vh] max-w-[92vw] rounded-2xl object-contain shadow-plum"
-        />
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-ink-100">
-          <span className="font-medium text-white">
+        <div className="rounded-[4px] bg-white p-2 pb-7 shadow-daylight-print-lg">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.url}
+            alt={item.uploaderName ? `Photo by ${item.uploaderName}` : "Photo"}
+            className="max-h-[76vh] max-w-[88vw] rounded-[2px] object-contain"
+          />
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3 font-mono text-xs text-[#b7a988]">
+          <span className="font-bold text-daylight-paper">
             {item.uploaderName ?? "Anonymous"}
           </span>
-          <span className="text-ink-400">·</span>
+          <span>·</span>
           <time dateTime={item.createdAt}>
             {new Date(item.createdAt).toLocaleString()}
           </time>
@@ -610,7 +624,7 @@ function Lightbox({
             type="button"
             onClick={onDelete}
             disabled={deleting}
-            className="rounded-pill border border-red-400/40 bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-200 transition hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-daylight-chip border border-red-400/40 bg-red-500/15 px-3 py-1 font-bold text-red-200 transition hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {deleting ? "Deleting…" : "Delete"}
           </button>
@@ -621,7 +635,7 @@ function Lightbox({
               type="button"
               onClick={onPrev}
               aria-label="Previous photo"
-              className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-lg text-white backdrop-blur transition hover:bg-white/[0.12]"
+              className="ml-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-lg text-daylight-paper backdrop-blur transition hover:bg-white/20"
             >
               ‹
             </button>
@@ -633,7 +647,7 @@ function Lightbox({
               type="button"
               onClick={onNext}
               aria-label="Next photo"
-              className="mr-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-lg text-white backdrop-blur transition hover:bg-white/[0.12]"
+              className="mr-2 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-lg text-daylight-paper backdrop-blur transition hover:bg-white/20"
             >
               ›
             </button>
@@ -643,7 +657,7 @@ function Lightbox({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute -right-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-ink-800 text-sm text-white shadow-plum transition hover:bg-ink-700"
+          className="absolute -right-2 -top-2 flex h-9 w-9 items-center justify-center rounded-full bg-daylight-paper text-sm text-daylight-ink shadow-daylight-card transition hover:bg-white"
         >
           ✕
         </button>

@@ -3,120 +3,26 @@
 @tailwind utilities;
 
 /*
- * FRI-26 visual system. Dark canvas, plum + pop accent, chunky pill buttons.
- * Component classes live in @layer components so utility overrides still win
- * (e.g. `className="btn-pop w-full"`), and Tailwind can tree-shake unused
- * classes on the guest bundle.
+ * Daylight (FRI-33→36): warm film-paper light theme. All component styling
+ * lives in the components/ui primitives + Tailwind utilities; no component
+ * classes are defined here. The FRI-26 dark theme that used to live in this
+ * file was removed in FRI-36 once the last screens (host dashboard) migrated.
  *
- * Guest-bundle rule: no custom font loads here. Everything below inherits the
- * system font stack from tailwind.config so `/e/[slug]` stays under 110 kB.
+ * Guest-bundle rule: no font loads here. Daylight fonts are self-hosted via
+ * next/font in components/ui/fonts.ts and applied by <ScreenShell>, so
+ * `/e/[slug]` pays only for what it renders (TECH_SPEC §8).
  */
 
 :root {
-  color-scheme: dark;
-  --ink: #0e0e13;
-}
-
-html,
-body {
-  background-color: var(--ink);
+  color-scheme: light;
 }
 
 body {
-  @apply min-h-screen bg-ink text-ink-50 antialiased;
-  font-feature-settings: "ss01", "cv11";
+  @apply min-h-screen bg-daylight-paper text-daylight-ink antialiased;
 }
 
-/* Selection uses the pop accent — matches the CTA palette. */
+/* Selection uses the brand orange. */
 ::selection {
-  background: #ff3d8b;
+  background: #ff6a00;
   color: #fff;
-}
-
-@layer components {
-  /* Layout shell — dark canvas with a soft plum/magenta glow at the top. */
-  .app-shell {
-    @apply relative min-h-screen bg-ink text-ink-50;
-    background-image:
-      radial-gradient(1200px 600px at 20% -10%, rgba(108, 63, 181, 0.18), transparent 60%),
-      radial-gradient(900px 500px at 100% 10%, rgba(255, 61, 139, 0.12), transparent 55%);
-  }
-
-  /* Display heading — big, tight, confident. System stack (see config). */
-  .h-display {
-    @apply font-display font-black tracking-tight text-white;
-    letter-spacing: -0.02em;
-  }
-
-  .h-eyebrow {
-    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-200;
-  }
-
-  /* Primary CTA — pop accent, pill, tactile press. */
-  .btn-pop {
-    @apply inline-flex items-center justify-center gap-2 rounded-pill
-      bg-pop-gradient px-5 py-3 text-sm font-semibold text-white
-      shadow-pop transition
-      hover:brightness-110
-      active:scale-[0.98]
-      disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none;
-  }
-
-  /* Secondary CTA — plum outline, still pill-shaped. */
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-pill
-      border border-white/15 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-white
-      transition
-      hover:border-white/30 hover:bg-white/[0.06]
-      active:scale-[0.98]
-      disabled:cursor-not-allowed disabled:opacity-60;
-  }
-
-  /* Plum-filled variant for when we want the brand on a CTA (host pages). */
-  .btn-plum {
-    @apply inline-flex items-center justify-center gap-2 rounded-pill
-      bg-plum-gradient px-5 py-3 text-sm font-semibold text-white
-      shadow-plum transition
-      hover:brightness-110
-      active:scale-[0.98]
-      disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none;
-  }
-
-  /* Small chip — filter pills, badges. */
-  .chip {
-    @apply inline-flex items-center gap-1.5 rounded-pill border border-white/10
-      bg-white/[0.04] px-3 py-1 text-xs font-medium text-ink-100
-      transition
-      hover:border-white/25 hover:bg-white/[0.07];
-  }
-  .chip-active {
-    @apply border-transparent bg-pop-gradient text-white shadow-pop
-      hover:brightness-110;
-  }
-
-  /* Surface card — the rounded, elevated container motif. */
-  .card {
-    @apply rounded-card border bg-white/[0.03] p-5 shadow-card;
-    border-color: rgba(255, 255, 255, 0.06);
-  }
-  .card-tight {
-    @apply rounded-card border bg-white/[0.03] p-4 shadow-card;
-    border-color: rgba(255, 255, 255, 0.06);
-  }
-
-  /* Dark input — matches the card surface, focus glows plum. */
-  .input {
-    @apply w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white
-      placeholder:text-ink-300
-      focus:border-plum-400 focus:outline-none focus:ring-2 focus:ring-plum-500/40;
-  }
-
-  .field-label {
-    @apply block text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-200;
-  }
-
-  /* Inline banners. */
-  .banner-error {
-    @apply rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200;
-  }
 }

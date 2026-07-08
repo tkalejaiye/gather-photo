@@ -718,9 +718,9 @@ export function GuestFlow({
                   : "Hang tight — landing in the roll."}
             </p>
 
-            <div className="mt-[26px] h-[10px] w-full max-w-[280px] overflow-hidden rounded-pill bg-daylight-ink/[0.08]">
+            <div className="mt-[26px] h-[10px] w-full max-w-[280px] overflow-hidden rounded-full bg-daylight-ink/[0.08]">
               <div
-                className="h-full rounded-pill bg-daylight-orange-grad transition-[width] duration-200"
+                className="h-full rounded-full bg-daylight-orange-grad transition-[width] duration-200"
                 style={{ width: `${overallPct}%` }}
               />
             </div>
@@ -841,9 +841,9 @@ export function GuestFlow({
                       </span>
                     </div>
                     {item.status === "uploading" ? (
-                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-pill bg-daylight-ink/[0.08]">
+                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-daylight-ink/[0.08]">
                         <div
-                          className="h-full rounded-pill bg-daylight-orange-grad transition-[width] duration-200"
+                          className="h-full rounded-full bg-daylight-orange-grad transition-[width] duration-200"
                           style={{
                             width: `${Math.round((item.progress ?? 0) * 100)}%`,
                           }}

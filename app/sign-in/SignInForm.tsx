@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { BackButton } from "@/components/ui/back-button";
 import { Button } from "@/components/ui/button";
 import { cx } from "@/components/ui/cx";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Field } from "@/components/ui/field";
 import {
@@ -264,20 +265,6 @@ export function SignInForm({ initialMode, initialError, googleEnabled }: Props) 
         </span>
       </button>
     </div>
-  );
-}
-
-function ErrorBanner({ message, className }: { message: string; className?: string }) {
-  return (
-    <p
-      role="alert"
-      className={cx(
-        "rounded-daylight-field border border-daylight-red/50 bg-daylight-red/10 px-4 py-3 text-sm text-daylight-red-deep",
-        className,
-      )}
-    >
-      {message}
-    </p>
   );
 }
 

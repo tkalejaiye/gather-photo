@@ -2,12 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ensureProfile } from "@/lib/auth/ensureProfile";
+import { daylightButtonClasses } from "@/components/ui/button";
+import { Eyebrow } from "@/components/ui/eyebrow";
+import { ScreenShell } from "@/components/ui/screen-shell";
+import { Wordmark } from "@/components/ui/wordmark";
 import { SignOutButton } from "./SignOutButton";
+import { StatusChip, fullDate } from "./status";
 
-// Host dashboard — gallery grid, counts, delete, ZIP download (M3).
-// FRI-7: gated behind Supabase auth.
-// FRI-8: lists the host's events and links to the create-event flow.
-// FRI-26: visual pass — dark canvas, cards, pill CTAs.
+// Host dashboard — events list. FRI-7 gated it behind Supabase auth, FRI-8
+// added the list + create link. FRI-36: Daylight. This screen has no mock;
+// it's derived from the tokens (design/daylight/README.md §Design Tokens):
+// wordmark header, paper cards, status chips.
 
 export default async function DashboardPage() {
   const supabase = createClient();
@@ -26,88 +31,77 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <main className="app-shell min-h-screen px-6 py-10">
-      <div className="mx-auto max-w-5xl">
+    <ScreenShell>
+      <main className="mx-auto w-full max-w-[960px] px-[26px] pb-16 pt-12 lg:px-10">
         <header className="flex flex-wrap items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="h-eyebrow inline-flex items-center gap-1 text-ink-300 transition hover:text-white"
-          >
-            gather.photo
-          </Link>
-          <div className="flex items-center gap-3 text-sm text-ink-200">
-            <span className="hidden sm:inline">{user.email ?? user.phone}</span>
+          <Wordmark />
+          <div className="flex items-center gap-3">
+            <span className="hidden font-mono text-xs text-daylight-muted sm:inline">
+              {user.email ?? user.phone}
+            </span>
             <SignOutButton />
           </div>
         </header>
 
-        <div className="mt-8 flex flex-wrap items-end justify-between gap-4">
+        <div className="mt-12 flex flex-wrap items-end justify-between gap-5">
           <div>
-            <p className="h-eyebrow">Your events</p>
-            <h1 className="h-display mt-1 text-4xl sm:text-5xl">
-              What are we shooting? 📸
+            <Eyebrow>YOUR EVENTS</Eyebrow>
+            <h1 className="mt-2 font-display text-[34px] leading-[0.95] tracking-[0.005em] text-daylight-ink">
+              What are we shooting?
             </h1>
-            <p className="mt-2 text-sm text-ink-200">
+            <p className="mt-3 font-mono text-[13px] text-daylight-muted">
               {events?.length
                 ? `${events.length} event${events.length === 1 ? "" : "s"} · tap to open`
-                : "Spin up your first event — takes about 20 seconds."}
+                : "Your first event takes about 20 seconds."}
             </p>
           </div>
-          <Link href="/dashboard/new" className="btn-pop">
+          <Link
+            href="/dashboard/new"
+            className={daylightButtonClasses("primary", "!px-6 !py-3.5 text-sm")}
+          >
             + New event
           </Link>
         </div>
 
         {events && events.length > 0 ? (
-          <ul className="mt-8 grid gap-3 sm:grid-cols-2">
+          <ul className="mt-7 grid gap-3.5 sm:grid-cols-2">
             {events.map((e) => (
               <li key={e.id}>
                 <Link
                   href={`/dashboard/events/${e.id}`}
-                  className="card block transition hover:-translate-y-0.5 hover:border-white/20 focus:border-white/30 focus:outline-none"
+                  className="block rounded-daylight-card-lg border border-daylight-rule bg-white/55 p-[18px] shadow-daylight-card-sm transition hover:-translate-y-0.5 hover:shadow-daylight-card focus:outline-none focus-visible:border-daylight-orange focus-visible:shadow-daylight-focus"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-lg font-semibold text-white">
+                      <div className="truncate font-display text-lg uppercase leading-tight text-daylight-ink">
                         {e.name}
                       </div>
-                      <div className="mt-1 text-xs text-ink-300">
-                        {e.event_date ?? "no date"} · /e/{e.slug}
+                      <div className="mt-2 font-mono text-[11px] text-daylight-muted">
+                        {e.event_date ? fullDate(e.event_date) : "No date"} ·{" "}
+                        /e/{e.slug}
                       </div>
                     </div>
-                    <StatusBadge status={e.status} />
+                    <StatusChip status={e.status} />
                   </div>
                 </Link>
               </li>
             ))}
           </ul>
         ) : (
-          <div className="card mt-8 text-center">
-            <p className="mx-auto max-w-md text-sm text-ink-200">
-              Every event you create gets its own QR code + private gallery.
+          <div className="mt-7 rounded-daylight-card-lg border border-daylight-rule bg-white/55 p-8 text-center shadow-daylight-card-sm">
+            <p className="mx-auto max-w-md text-[15px] leading-relaxed text-daylight-ink-soft">
+              Every event you create gets its own QR code + a live roll.
               Guests scan, shoot, and every photo lands here.
             </p>
-            <Link href="/dashboard/new" className="btn-plum mt-5 inline-flex">
+            <Link
+              href="/dashboard/new"
+              className={daylightButtonClasses("primary", "mt-6 !px-7 !py-4 text-sm")}
+            >
               Create your first event
             </Link>
           </div>
         )}
-      </div>
-    </main>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const isOpen = status === "open";
-  return (
-    <span
-      className={
-        isOpen
-          ? "chip chip-active shrink-0"
-          : "chip shrink-0"
-      }
-    >
-      {status}
-    </span>
+      </main>
+    </ScreenShell>
   );
 }

@@ -50,6 +50,19 @@ function profilesTable() {
   return { upsert: async () => ({ error: null }) };
 }
 
+// Landing pill count (FRI-34): the open guest page runs one head-only COUNT
+// on `media` via the service client. Awaitable chain resolving zero rows.
+function mediaTable() {
+  const api = {
+    select: (..._args: unknown[]) => api,
+    eq: (..._args: unknown[]) => api,
+    then(resolve: (value: { count: number; error: null }) => void) {
+      resolve({ count: 0, error: null });
+    },
+  };
+  return api;
+}
+
 const fakeAuthClient = {
   auth: {
     getUser: async () => ({
@@ -60,7 +73,8 @@ const fakeAuthClient = {
 };
 
 const fakeServiceClient = {
-  from: (t: string) => (t === "events" ? eventsTable() : profilesTable()),
+  from: (t: string) =>
+    t === "events" ? eventsTable() : t === "media" ? mediaTable() : profilesTable(),
 };
 
 vi.mock("@supabase/ssr", () => ({
@@ -142,15 +156,15 @@ describe("create → open round trip", () => {
       searchParams: {},
     });
     const html = renderToStaticMarkup(tree);
-    expect(html).toContain("Tunde &amp; Amaka");
-    expect(html).toContain("Drop your photos");
-    // FRI-9 shell: name input + camera + multi-select affordances render
-    // server-side so the guest sees them before client JS hydrates.
-    expect(html).toContain("Your name (optional)");
-    expect(html).toContain("Take photo");
-    expect(html).toContain("Choose photos");
-    expect(html).toMatch(/capture="environment"/);
-    expect(html).toMatch(/<input[^>]*\bmultiple\b/);
+    // Daylight landing (FRI-34) renders server-side: uppercase hero (the
+    // accent span splits the name), live eyebrow, real shots count, and the
+    // primary CTA. Camera/library inputs moved to the client-side picker
+    // screen, so they are no longer part of the SSR shell.
+    expect(html).toContain("Tunde &amp;");
+    expect(html).toContain("Amaka");
+    expect(html).toContain("ROLL · LIVE");
+    expect(html).toContain("0 SHOTS IN THE ROLL");
+    expect(html).toContain("Add your shots");
   });
 
   it("404s on an unknown slug", async () => {

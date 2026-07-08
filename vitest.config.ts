@@ -7,7 +7,12 @@ export default defineConfig({
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./") },
+    alias: {
+      "@": path.resolve(__dirname, "./"),
+      // next/font only runs inside the Next build; page-composition tests
+      // render routes that use it (via components/ui/fonts.ts).
+      "next/font/local": path.resolve(__dirname, "./tests/stubs/next-font-local.ts"),
+    },
   },
   esbuild: {
     jsx: "automatic",

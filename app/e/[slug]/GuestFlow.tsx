@@ -760,13 +760,19 @@ export function GuestFlow({
               ))}
 
               {batchItems.map((item, i) => (
+                // While hard-offline, a 'failed' row is not what it means: the
+                // engine auto-requeues failed items on `online`, and Retry is a
+                // dead button (drainQueue refuses to start offline). Present
+                // those rows as calmly waiting; genuine failures resurface in
+                // red — with error text and Retry — once we're back online and
+                // the auto-retry has actually had a chance to fail.
                 <li
                   key={item.id}
                   data-item-id={item.id}
                   data-status={item.status}
                   className={cx(
                     "flex items-center gap-3 rounded-daylight-card border bg-white/50 p-3",
-                    item.status === "failed"
+                    item.status === "failed" && !offline
                       ? "border-daylight-red/40"
                       : "border-daylight-rule-light",
                   )}
@@ -784,16 +790,18 @@ export function GuestFlow({
                         </span>
                       </span>
                       <span className="flex shrink-0 items-center gap-2">
-                        <QueueBadge item={item} />
+                        <QueueBadge item={item} offline={offline} />
                         {item.status === "failed" ? (
                           <>
-                            <button
-                              type="button"
-                              onClick={() => retryItem(item.id)}
-                              className="rounded-daylight-chip border border-daylight-rule bg-white/60 px-2.5 py-1 font-mono text-[11px] font-bold uppercase text-daylight-ink transition active:scale-[0.95]"
-                            >
-                              Retry
-                            </button>
+                            {!offline ? (
+                              <button
+                                type="button"
+                                onClick={() => retryItem(item.id)}
+                                className="rounded-daylight-chip border border-daylight-rule bg-white/60 px-2.5 py-1 font-mono text-[11px] font-bold uppercase text-daylight-ink transition active:scale-[0.95]"
+                              >
+                                Retry
+                              </button>
+                            ) : null}
                             <button
                               type="button"
                               onClick={() => removeItem(item.id)}
@@ -815,7 +823,7 @@ export function GuestFlow({
                         />
                       </div>
                     ) : null}
-                    {item.status === "failed" && item.lastError ? (
+                    {item.status === "failed" && item.lastError && !offline ? (
                       <p
                         data-error-detail=""
                         className="mt-1 break-words font-mono text-[11px] text-daylight-red-deep"
@@ -1031,7 +1039,7 @@ function ItemThumb({
   );
 }
 
-function QueueBadge({ item }: { item: UploadItem }) {
+function QueueBadge({ item, offline }: { item: UploadItem; offline: boolean }) {
   switch (item.status) {
     case "queued":
       return (
@@ -1052,7 +1060,15 @@ function QueueBadge({ item }: { item: UploadItem }) {
         </span>
       );
     case "failed":
-      return (
+      // Offline, 'failed' just means "the network went away mid-transfer" —
+      // deliberately not phrased as a promise of auto-retry, since an item
+      // that exhausted MAX_ATTEMPTS reverts to a red Failed (+ Retry) once
+      // we're back online instead of resuming on its own.
+      return offline ? (
+        <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-daylight-muted">
+          Waiting
+        </span>
+      ) : (
         <span
           className="font-mono text-[11px] font-bold uppercase tracking-wide text-daylight-red"
           title={item.lastError ?? "Upload failed"}

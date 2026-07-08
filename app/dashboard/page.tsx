@@ -18,7 +18,7 @@ export default async function DashboardPage() {
 
   // Idempotent — guarantees a profiles row exists for every signed-in host,
   // including users created out-of-band (Supabase dashboard/CLI).
-  await ensureProfile(supabase, user.id);
+  await ensureProfile(supabase, user);
 
   const { data: events } = await supabase
     .from("events")

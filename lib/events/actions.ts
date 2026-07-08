@@ -42,7 +42,7 @@ export async function createEvent(
 
   // Required because events.host_id → profiles(id); a brand-new auth user
   // may not have a profiles row yet.
-  await ensureProfile(supabase, user.id);
+  await ensureProfile(supabase, user);
 
   // Until payments land (M4), allow events to be active immediately so the
   // critical-path guest flow can be exercised. M4 will flip default → 'draft'

@@ -53,7 +53,7 @@ Module contracts (see `lib/`): `image/compress.ts` `compress(file) → Blob`; `u
 
 ## 6. Host flow
 
-Sign up (email/phone OTP) → create event (name/date/PIN/tier) → pay (Paystack) → event `active`, windows set → get QR + link, one-tap WhatsApp share, printable QR card → dashboard: grid, counts, filter by uploader, delete, Download-all ZIP.
+Sign up (email magic link, or Google OAuth behind `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED`) → create event (name/date/PIN/tier) → pay (Paystack) → event `active`, windows set → get QR + link, one-tap WhatsApp share, printable QR card → dashboard: grid, counts, filter by uploader, delete, Download-all ZIP.
 
 ## 7. Paystack integration
 

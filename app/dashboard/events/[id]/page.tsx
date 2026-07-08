@@ -81,16 +81,16 @@ export default async function EventDetailPage({
 
   return (
     <ScreenShell contentClassName="lg:flex-row">
-      {/* D4 sidebar — dark ink, wordmark, Events nav, pinned current event. */}
+      {/* D4 sidebar — dark ink, event-scoped: its nav items are sections
+          WITHIN this event (FRI-30 moderation and FRI-37 The Roll slot in
+          here), so every nav destination keeps the sidebar. Leaving the
+          event happens through the wordmark or the pinned current-event
+          card (the mock's ▾ switcher) — both go to /dashboard. */}
       <aside className="hidden bg-daylight-ink px-5 py-7 lg:flex lg:w-[244px] lg:shrink-0 lg:flex-col">
-        <Wordmark tone="paper" />
-        <nav className="mt-9 flex flex-col gap-1" aria-label="Dashboard">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-3 rounded-[11px] px-3.5 py-3 text-sm font-bold text-[#b7a988] transition hover:bg-white/[0.06] hover:text-daylight-paper"
-          >
-            <span aria-hidden>▦</span> Events
-          </Link>
+        <Link href="/dashboard" aria-label="Back to your events" className="self-start">
+          <Wordmark tone="paper" />
+        </Link>
+        <nav className="mt-9 flex flex-col gap-1" aria-label="Event sections">
           <span
             aria-current="page"
             className="flex items-center gap-3 rounded-[11px] bg-daylight-orange-grad px-3.5 py-3 text-sm font-bold text-white"
@@ -99,15 +99,19 @@ export default async function EventDetailPage({
           </span>
         </nav>
         <div className="flex-1" />
-        <div className="rounded-[13px] bg-white/[0.07] p-4">
+        <Link
+          href="/dashboard"
+          aria-label="Switch event"
+          className="block rounded-[13px] bg-white/[0.07] p-4 transition hover:bg-white/[0.12]"
+        >
           <div className="font-mono text-[11px] tracking-[0.1em] text-daylight-muted">
             CURRENT EVENT
           </div>
           <div className="mt-1.5 break-words font-display text-sm leading-snug text-daylight-paper">
             {event.name}
           </div>
-          <div className="mt-1 font-mono text-[11px] text-[#b7a988]">{line}</div>
-        </div>
+          <div className="mt-1 font-mono text-[11px] text-[#b7a988]">{line} ▾</div>
+        </Link>
       </aside>
 
       <main className="mx-auto w-full max-w-[1060px] flex-1 px-[22px] pb-12 pt-14 lg:px-9 lg:pt-[34px]">

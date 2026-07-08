@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #ded1b6; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+  a { color: #c85a12; text-decoration: none; }
+  a:hover { color: #a3450c; }
+  @keyframes gp-fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes gp-pop { 0% { opacity: 0; transform: scale(.6); } 60% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes gp-spin { to { transform: rotate(360deg); } }
+  @keyframes gp-float { 0%,100% { transform: translateY(0) rotate(var(--r,0deg)); } 50% { transform: translateY(-6px) rotate(var(--r,0deg)); } }
+  @keyframes gp-blink { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 28px; box-sizing: border-box; background: radial-gradient(140% 120% at 50% -20%, #efe6d2 0%, #e2d6bd 55%, #d3c4a6 100%);">
+  <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ false }}" hint-size="402px,874px">
+
+    <div style="position: absolute; inset: 0; background: #F4E9CE; overflow: hidden; font-family: 'Archivo', system-ui, sans-serif;">
+      <!-- warm ambient -->
+      <div style="position: absolute; inset: 0; pointer-events: none; background: radial-gradient(115% 82% at 6% -8%, rgba(255,138,30,0.16), transparent 52%), radial-gradient(115% 78% at 104% 0%, rgba(23,183,166,0.12), transparent 50%);"></div>
+
+      <div style="position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;">
+
+        <!-- ══════════ WELCOME (auth gate) ══════════ -->
+        <sc-if value="{{ isWelcome }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 74px 26px 44px; display: flex; flex-direction: column; animation: gp-fade .4s ease both;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px;">◉</div>
+              <span style="font-family: 'Archivo Black', sans-serif; font-size: 17px; letter-spacing: 0.02em; color: #241a0c;">GATHER<span style="color: #FF6A00;">.PHOTO</span></span>
+            </div>
+
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 22px;">
+              <div style="position: relative; height: 150px;">
+                <div style="position: absolute; left: 8px; top: 12px; width: 112px; background: #fff; padding: 8px 8px 24px; border-radius: 3px; --r: -9deg; transform: rotate(-9deg); box-shadow: 0 12px 26px rgba(90,70,30,0.3); animation: gp-float 5.5s ease-in-out infinite;"><div style="height: 92px; background: linear-gradient(150deg,#17B7A6,#0c5b52);"></div></div>
+                <div style="position: absolute; left: 104px; top: 2px; width: 116px; background: #fff; padding: 8px 8px 24px; border-radius: 3px; --r: 5deg; transform: rotate(5deg); box-shadow: 0 12px 26px rgba(90,70,30,0.3); animation: gp-float 5.5s ease-in-out infinite .5s;"><div style="height: 98px; background: linear-gradient(150deg,#F5852A,#a34a12);"></div></div>
+                <div style="position: absolute; right: 4px; top: 20px; width: 96px; background: #fff; padding: 7px 7px 22px; border-radius: 3px; --r: 12deg; transform: rotate(12deg); box-shadow: 0 12px 26px rgba(90,70,30,0.3); animation: gp-float 5.5s ease-in-out infinite 1s;"><div style="height: 80px; background: linear-gradient(150deg,#E9C33C,#a3791c);"></div></div>
+              </div>
+              <div>
+                <h1 style="margin: 0; font-family: 'Archivo Black', sans-serif; font-size: 42px; line-height: 0.95; letter-spacing: 0.005em; color: #241a0c;">Every guest's photos.<br><span style="color: #FF6A00;">One live roll.</span></h1>
+                <p style="margin: 16px 0 0; font-size: 16px; line-height: 1.5; color: #6b5c3a; max-width: 300px;">Create an event, share one link, and watch the shots roll in — no app for your guests.</p>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <button onClick="{{ goSignup }}" style="border: none; cursor: pointer; padding: 18px; border-radius: 14px; font-family: 'Archivo Black', sans-serif; font-size: 16px; letter-spacing: 0.02em; text-transform: uppercase; color: #fff; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%); box-shadow: 0 12px 28px rgba(255,106,0,0.38);" style-active="transform: scale(.97);">Create host account</button>
+              <button onClick="{{ goLogin }}" style="cursor: pointer; padding: 15px; border-radius: 14px; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 13px; letter-spacing: 0.06em; color: #241a0c; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a;" style-active="transform: scale(.97);">LOG IN</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ SIGN UP ══════════ -->
+        <sc-if value="{{ isSignup }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 70px 26px 40px; display: flex; flex-direction: column; animation: gp-fade .35s ease both;">
+            <button onClick="{{ goWelcome }}" style="align-self: flex-start; width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a; color: #241a0c; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;" style-active="transform: scale(.92);">←</button>
+
+            <div style="margin-top: 24px;">
+              <div style="font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; color: #c85a12; margin-bottom: 10px;">CREATE ACCOUNT</div>
+              <h1 style="margin: 0; font-family: 'Archivo Black', sans-serif; font-size: 34px; letter-spacing: 0.005em; color: #241a0c;">Start hosting</h1>
+            </div>
+
+            <button onClick="{{ googleAuth }}" style="margin-top: 26px; cursor: pointer; width: 100%; padding: 15px; border-radius: 14px; background: #fff; border: 1px solid #d8c49a; display: flex; align-items: center; justify-content: center; gap: 11px; font-family: 'Archivo', sans-serif; font-weight: 700; font-size: 15px; color: #241a0c; box-shadow: 0 4px 12px rgba(90,70,30,0.1);" style-active="transform: scale(.98);">
+              <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.5-2.1 14.3-5.6l-6.6-5.6C29.7 34.6 27 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.8l6.6 5.6C41.4 36.9 44 31.1 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+              Continue with Google
+            </button>
+
+            <div style="display: flex; align-items: center; gap: 12px; margin: 20px 0;">
+              <div style="flex: 1; height: 1px; background: #d8c49a;"></div>
+              <span style="font-family: 'Space Mono', monospace; font-size: 11px; color: #8a7a56;">or</span>
+              <div style="flex: 1; height: 1px; background: #d8c49a;"></div>
+            </div>
+
+            <label style="font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #8a7a56;">YOUR NAME</label>
+            <input value="{{ authName }}" onInput="{{ onAuthName }}" placeholder="Priya Rao" maxLength="40" style="margin: 7px 0 16px; width: 100%; box-sizing: border-box; padding: 15px; border-radius: 13px; background: rgba(255,255,255,0.6); border: 1px solid #d8c49a; color: #241a0c; font-family: 'Archivo', sans-serif; font-size: 16px; font-weight: 600; outline: none;" style-focus="border-color: #FF6A00; box-shadow: 0 0 0 4px rgba(255,106,0,0.18);" />
+            <label style="font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #8a7a56;">EMAIL</label>
+            <input value="{{ authEmail }}" onInput="{{ onAuthEmail }}" type="email" placeholder="you@email.com" style="margin: 7px 0 0; width: 100%; box-sizing: border-box; padding: 15px; border-radius: 13px; background: rgba(255,255,255,0.6); border: 1px solid #d8c49a; color: #241a0c; font-family: 'Archivo', sans-serif; font-size: 16px; font-weight: 600; outline: none;" style-focus="border-color: #FF6A00; box-shadow: 0 0 0 4px rgba(255,106,0,0.18);" />
+
+            <div style="flex: 1;"></div>
+
+            <button onClick="{{ sendLink }}" style="border: none; cursor: pointer; padding: 18px; border-radius: 14px; font-family: 'Archivo Black', sans-serif; font-size: 16px; text-transform: uppercase; color: #fff; background: {{ signupBg }}; box-shadow: {{ signupShadow }}; opacity: {{ signupOpacity }}; transition: opacity .2s;" style-active="transform: scale(.97);">Email me a magic link</button>
+            <button onClick="{{ goLogin }}" style="margin-top: 12px; background: none; border: none; cursor: pointer; padding: 6px; font-family: 'Space Mono', monospace; font-size: 12px; color: #8a7a56;">Already hosting? <span style="color: #c85a12; font-weight: 700;">Log in</span></button>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ LOG IN ══════════ -->
+        <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 70px 26px 40px; display: flex; flex-direction: column; animation: gp-fade .35s ease both;">
+            <button onClick="{{ goWelcome }}" style="align-self: flex-start; width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a; color: #241a0c; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;" style-active="transform: scale(.92);">←</button>
+
+            <div style="margin-top: 24px;">
+              <div style="font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; color: #c85a12; margin-bottom: 10px;">WELCOME BACK</div>
+              <h1 style="margin: 0; font-family: 'Archivo Black', sans-serif; font-size: 34px; letter-spacing: 0.005em; color: #241a0c;">Log in to host</h1>
+            </div>
+
+            <button onClick="{{ googleAuth }}" style="margin-top: 26px; cursor: pointer; width: 100%; padding: 15px; border-radius: 14px; background: #fff; border: 1px solid #d8c49a; display: flex; align-items: center; justify-content: center; gap: 11px; font-family: 'Archivo', sans-serif; font-weight: 700; font-size: 15px; color: #241a0c; box-shadow: 0 4px 12px rgba(90,70,30,0.1);" style-active="transform: scale(.98);">
+              <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.5 0 10.5-2.1 14.3-5.6l-6.6-5.6C29.7 34.6 27 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.8l6.6 5.6C41.4 36.9 44 31.1 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+              Continue with Google
+            </button>
+
+            <div style="display: flex; align-items: center; gap: 12px; margin: 20px 0;">
+              <div style="flex: 1; height: 1px; background: #d8c49a;"></div>
+              <span style="font-family: 'Space Mono', monospace; font-size: 11px; color: #8a7a56;">or</span>
+              <div style="flex: 1; height: 1px; background: #d8c49a;"></div>
+            </div>
+
+            <label style="font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #8a7a56;">EMAIL</label>
+            <input value="{{ authEmail }}" onInput="{{ onAuthEmail }}" type="email" placeholder="you@email.com" style="margin: 7px 0 0; width: 100%; box-sizing: border-box; padding: 15px; border-radius: 13px; background: rgba(255,255,255,0.6); border: 1px solid #d8c49a; color: #241a0c; font-family: 'Archivo', sans-serif; font-size: 16px; font-weight: 600; outline: none;" style-focus="border-color: #FF6A00; box-shadow: 0 0 0 4px rgba(255,106,0,0.18);" />
+
+            <div style="flex: 1;"></div>
+
+            <button onClick="{{ sendLink }}" style="border: none; cursor: pointer; padding: 18px; border-radius: 14px; font-family: 'Archivo Black', sans-serif; font-size: 16px; text-transform: uppercase; color: #fff; background: {{ loginBg }}; box-shadow: {{ loginShadow }}; opacity: {{ loginOpacity }}; transition: opacity .2s;" style-active="transform: scale(.97);">Email me a magic link</button>
+            <button onClick="{{ goSignup }}" style="margin-top: 12px; background: none; border: none; cursor: pointer; padding: 6px; font-family: 'Space Mono', monospace; font-size: 12px; color: #8a7a56;">New here? <span style="color: #c85a12; font-weight: 700;">Create account</span></button>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ CHECK EMAIL ══════════ -->
+        <sc-if value="{{ isCheckEmail }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 70px 34px 40px; display: flex; flex-direction: column; animation: gp-fade .3s ease both;">
+            <button onClick="{{ goBackAuth }}" style="align-self: flex-start; width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a; color: #241a0c; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;" style-active="transform: scale(.92);">←</button>
+
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 24px;">
+              <div style="width: 104px; height: 104px; border-radius: 26px; background: rgba(255,255,255,0.6); border: 1px solid #d8c49a; display: flex; align-items: center; justify-content: center; box-shadow: 0 14px 30px rgba(90,70,30,0.16);">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="7" y="12" width="34" height="24" rx="4" stroke="#FF6A00" stroke-width="3"/><path d="M9 15l15 11 15-11" stroke="#FF6A00" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div>
+                <h1 style="margin: 0 0 12px; font-family: 'Archivo Black', sans-serif; font-size: 32px; letter-spacing: 0.005em; color: #241a0c;">Check your email</h1>
+                <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #6b5c3a; max-width: 290px;">We sent a magic link to <span style="font-family: 'Space Mono', monospace; font-weight: 700; color: #241a0c;">{{ sentTo }}</span>. Tap it to finish signing in.</p>
+              </div>
+            </div>
+
+            <button onClick="{{ continueFromEmail }}" style="border: none; cursor: pointer; padding: 18px; border-radius: 14px; font-family: 'Archivo Black', sans-serif; font-size: 16px; text-transform: uppercase; color: #fff; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%); box-shadow: 0 12px 28px rgba(255,106,0,0.38);" style-active="transform: scale(.97);">◉&nbsp;&nbsp;I opened the link</button>
+            <button onClick="{{ goBackAuth }}" style="margin-top: 12px; background: none; border: none; cursor: pointer; padding: 6px; font-family: 'Space Mono', monospace; font-size: 12px; color: #8a7a56;">Didn't get it? <span style="color: #c85a12; font-weight: 700;">Resend or change email</span></button>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ CREATE FIRST EVENT ══════════ -->
+        <sc-if value="{{ isCreateEvent }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 70px 26px 40px; display: flex; flex-direction: column; animation: gp-fade .35s ease both;">
+            <div style="font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; color: #c85a12;">NEW EVENT</div>
+            <h1 style="margin: 8px 0 0; font-family: 'Archivo Black', sans-serif; font-size: 34px; letter-spacing: 0.005em; color: #241a0c;">Create your event</h1>
+
+            <!-- live cover preview -->
+            <div style="margin: 22px 0 24px; border-radius: 16px; overflow: hidden; box-shadow: 0 14px 30px rgba(90,70,30,0.2); background: {{ eventCoverGrad }}; position: relative; height: 132px; display: flex; flex-direction: column; justify-content: flex-end; padding: 16px;">
+              <div style="position: absolute; inset: 0; background: linear-gradient(transparent 30%, rgba(0,0,0,0.42));"></div>
+              <div style="position: relative; font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; color: rgba(255,255,255,0.85); margin-bottom: 4px;">GATHER.PHOTO</div>
+              <div style="position: relative; font-family: 'Archivo Black', sans-serif; font-size: 26px; line-height: 1; color: #fff; text-transform: uppercase;">{{ eventPreviewName }}</div>
+            </div>
+
+            <label style="font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #8a7a56;">EVENT NAME</label>
+            <input value="{{ eventName }}" onInput="{{ onEventName }}" placeholder="Lake House '26" maxLength="32" style="margin: 7px 0 16px; width: 100%; box-sizing: border-box; padding: 15px; border-radius: 13px; background: rgba(255,255,255,0.6); border: 1px solid #d8c49a; color: #241a0c; font-family: 'Archivo', sans-serif; font-size: 16px; font-weight: 700; outline: none;" style-focus="border-color: #FF6A00; box-shadow: 0 0 0 4px rgba(255,106,0,0.18);" />
+
+            <label style="font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #8a7a56;">DATES</label>
+            <div style="margin: 7px 0 16px; width: 100%; box-sizing: border-box; padding: 15px; border-radius: 13px; background: rgba(255,255,255,0.6); border: 1px solid #d8c49a; color: #241a0c; font-family: 'Space Mono', monospace; font-size: 14px; display: flex; align-items: center; justify-content: space-between;"><span>Jul 4 – Jul 7, 2026</span><span style="color: #8a7a56;">▾</span></div>
+
+            <label style="font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #8a7a56;">COVER</label>
+            <div style="display: flex; gap: 12px; margin-top: 10px;">
+              <sc-for list="{{ coverSwatches }}" as="c" hint-placeholder-count="4">
+                <div data-idx="{{ c.idx }}" onClick="{{ setCover }}" style="width: 52px; height: 52px; border-radius: 13px; cursor: pointer; background: {{ c.grad }}; box-shadow: {{ c.ring }};" style-active="transform: scale(.92);"></div>
+              </sc-for>
+            </div>
+
+            <div style="flex: 1;"></div>
+
+            <button onClick="{{ createEvent }}" style="border: none; cursor: pointer; padding: 18px; border-radius: 14px; font-family: 'Archivo Black', sans-serif; font-size: 16px; text-transform: uppercase; color: #fff; background: {{ createBg }}; box-shadow: {{ createShadow }}; opacity: {{ createOpacity }}; transition: opacity .2s;" style-active="transform: scale(.97);">Create event &amp; get link</button>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ LANDING ══════════ -->
+        <sc-if value="{{ isLanding }}" hint-placeholder-val="{{ true }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 84px 26px 44px; display: flex; flex-direction: column; animation: gp-fade .4s ease both;">
+            <div style="display: flex; align-items: center; gap: 9px; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; color: #c85a12;">
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: #FF6A00; box-shadow: 0 0 9px rgba(255,106,0,0.7); animation: gp-blink 1.4s infinite;"></span>
+              ROLL 01 · LIVE
+            </div>
+
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 20px; padding: 26px 0;">
+              <div>
+                <h1 style="margin: 0; font-family: 'Archivo Black', sans-serif; font-size: 54px; line-height: 0.88; letter-spacing: 0.005em; color: #241a0c; text-transform: uppercase;">Lake<br>House<span style="color: #FF6A00;">'26</span></h1>
+                <div style="margin-top: 12px; font-family: 'Space Mono', monospace; font-size: 12px; color: #8a7a56;">07·04·26 &rarr; 07·07·26</div>
+              </div>
+
+              <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #6b5c3a; max-width: 300px;">Snap or upload from the weekend. Everyone's shots land in one live roll — no app, no login.</p>
+
+              <div style="position: relative; height: 150px; margin: 4px 0;">
+                <div style="position: absolute; left: 6px; top: 14px; width: 116px; background: #fff; padding: 8px 8px 24px; border-radius: 3px; --r: -9deg; transform: rotate(-9deg); box-shadow: 0 12px 26px rgba(90,70,30,0.32); animation: gp-float 5.5s ease-in-out infinite;"><div style="height: 96px; background: linear-gradient(150deg,#17B7A6,#0c5b52);"></div></div>
+                <div style="position: absolute; left: 100px; top: 4px; width: 118px; background: #fff; padding: 8px 8px 24px; border-radius: 3px; --r: 4deg; transform: rotate(4deg); box-shadow: 0 12px 26px rgba(90,70,30,0.32); animation: gp-float 5.5s ease-in-out infinite .5s;"><div style="height: 100px; background: linear-gradient(150deg,#F5852A,#a34a12); position: relative;"></div><div style="position: absolute; right: 12px; bottom: 6px; font-family: 'Space Mono', monospace; font-size: 9px; color: #FFD9A8;">07·05·26</div></div>
+                <div style="position: absolute; right: 2px; top: 22px; width: 100px; background: #fff; padding: 7px 7px 22px; border-radius: 3px; --r: 11deg; transform: rotate(11deg); box-shadow: 0 12px 26px rgba(90,70,30,0.32); animation: gp-float 5.5s ease-in-out infinite 1s;"><div style="height: 84px; background: linear-gradient(150deg,#E9C33C,#a3791c);"></div></div>
+              </div>
+
+              <div style="align-self: flex-start; font-family: 'Space Mono', monospace; font-size: 11px; color: #241a0c; border: 1px solid #d8c49a; background: rgba(255,255,255,0.4); padding: 8px 13px; border-radius: 9px;">◉ 132 SHOTS IN THE ROLL</div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <button onClick="{{ goStart }}" style="border: none; cursor: pointer; padding: 18px; border-radius: 14px; font-family: 'Archivo Black', sans-serif; font-size: 16px; letter-spacing: 0.02em; text-transform: uppercase; color: #fff; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%); box-shadow: 0 12px 28px rgba(255,106,0,0.38);" style-active="transform: scale(.97);">◉&nbsp;&nbsp;Add your shots</button>
+              <button onClick="{{ goGallery }}" style="cursor: pointer; padding: 15px; border-radius: 14px; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 13px; letter-spacing: 0.06em; color: #241a0c; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a;" style-active="transform: scale(.97);">SEE THE ROLL &rarr;</button>
+              <button onClick="{{ goLogin }}" style="background: none; border: none; cursor: pointer; padding: 6px; font-family: 'Space Mono', monospace; font-size: 12px; color: #8a7a56;">Hosting this event? Manage &rarr;</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ NAME ══════════ -->
+        <sc-if value="{{ isName }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 70px 26px 44px; display: flex; flex-direction: column; animation: gp-fade .35s ease both;">
+            <button onClick="{{ goLanding }}" style="align-self: flex-start; width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a; color: #241a0c; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;" style-active="transform: scale(.92);">←</button>
+
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 26px;">
+              <div style="display: flex; justify-content: center;">
+                <div style="width: 96px; height: 96px; border-radius: 24px; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%); display: flex; align-items: center; justify-content: center; font-family: 'Archivo Black', sans-serif; font-size: 44px; color: #fff; box-shadow: 0 16px 34px rgba(255,106,0,0.4);">{{ initial }}</div>
+              </div>
+              <div style="text-align: center;">
+                <div style="font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; color: #c85a12; margin-bottom: 12px;">ONE QUICK THING</div>
+                <h1 style="margin: 0 0 10px; font-family: 'Archivo Black', sans-serif; font-size: 34px; letter-spacing: 0.005em; color: #241a0c;">What's your name?</h1>
+                <p style="margin: 0; font-size: 15px; color: #6b5c3a; line-height: 1.45;">So friends know whose shots are whose.</p>
+              </div>
+              <input value="{{ nickname }}" onInput="{{ onName }}" placeholder="e.g. Priya" maxLength="24" style="width: 100%; box-sizing: border-box; text-align: center; padding: 18px; border-radius: 14px; background: rgba(255,255,255,0.6); border: 1px solid #d8c49a; color: #241a0c; font-family: 'Archivo', sans-serif; font-size: 20px; font-weight: 700; outline: none;" style-focus="border-color: #FF6A00; box-shadow: 0 0 0 4px rgba(255,106,0,0.2);" />
+            </div>
+
+            <button onClick="{{ goUpload }}" disabled="{{ nameEmpty }}" style="border: none; cursor: pointer; padding: 18px; border-radius: 14px; font-family: 'Archivo Black', sans-serif; font-size: 16px; text-transform: uppercase; color: #fff; background: {{ continueBg }}; box-shadow: {{ continueShadow }}; opacity: {{ continueOpacity }}; transition: opacity .2s;" style-active="transform: scale(.97);">Continue</button>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ UPLOAD PICKER ══════════ -->
+        <sc-if value="{{ isUpload }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 70px 26px 44px; display: flex; flex-direction: column; animation: gp-fade .35s ease both;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <button onClick="{{ goLanding }}" style="width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a; color: #241a0c; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;" style-active="transform: scale(.92);">←</button>
+              <div style="font-family: 'Space Mono', monospace; font-size: 13px; color: #8a7a56;">Hi, {{ displayName }}</div>
+            </div>
+
+            <div style="margin-top: 28px;">
+              <div style="font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; color: #c85a12; margin-bottom: 10px;">ADD TO THE ROLL</div>
+              <h1 style="margin: 0; font-family: 'Archivo Black', sans-serif; font-size: 34px; letter-spacing: 0.005em; color: #241a0c;">Pick your shots</h1>
+            </div>
+
+            <div style="display: flex; gap: 14px; margin-top: 24px;">
+              <button onClick="{{ addOne }}" style="flex: 1; cursor: pointer; aspect-ratio: 1; border-radius: 18px; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%); border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; box-shadow: 0 12px 28px rgba(255,106,0,0.32);" style-active="transform: scale(.96);">
+                <span style="font-size: 40px;">◉</span>
+                <span style="font-family: 'Archivo Black', sans-serif; font-size: 14px; text-transform: uppercase;">Take a photo</span>
+              </button>
+              <button onClick="{{ addOne }}" style="flex: 1; cursor: pointer; aspect-ratio: 1; border-radius: 18px; background: rgba(255,255,255,0.55); border: 1px solid #d8c49a; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #241a0c;" style-active="transform: scale(.96);">
+                <span style="font-size: 38px;">▦</span>
+                <span style="font-family: 'Archivo Black', sans-serif; font-size: 14px; text-transform: uppercase;">Library</span>
+              </button>
+            </div>
+
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end; margin-top: 24px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <span style="font-family: 'Archivo Black', sans-serif; font-size: 13px; text-transform: uppercase; color: #241a0c;">Selected</span>
+                <span style="font-family: 'Space Mono', monospace; font-size: 12px; color: #8a7a56;">{{ selectedCount }} ready</span>
+              </div>
+              <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px;">
+                <sc-for list="{{ selectedTray }}" as="s" hint-placeholder-count="4">
+                  <div style="flex: 0 0 auto; width: 80px; background: #fff; padding: 5px 5px 16px; border-radius: 3px; box-shadow: 0 6px 14px rgba(90,70,30,0.2);"><div style="height: 84px; background: {{ s.grad }};"></div></div>
+                </sc-for>
+              </div>
+            </div>
+
+            <button onClick="{{ startUpload }}" style="margin-top: 20px; border: none; cursor: pointer; padding: 18px; border-radius: 14px; font-family: 'Archivo Black', sans-serif; font-size: 16px; text-transform: uppercase; color: #fff; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%); box-shadow: 0 12px 28px rgba(255,106,0,0.38);" style-active="transform: scale(.97);">Add {{ selectedCount }} shots</button>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ UPLOADING ══════════ -->
+        <sc-if value="{{ isUploading }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 70px 34px 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; animation: gp-fade .3s ease both;">
+            <div style="position: relative; width: 150px; height: 150px; margin-bottom: 40px;">
+              <div style="position: absolute; inset: 0; border-radius: 50%; border: 8px solid rgba(36,26,12,0.08);"></div>
+              <div style="position: absolute; inset: 0; border-radius: 50%; border: 8px solid transparent; border-top-color: #FF6A00; border-right-color: #FF8A1E; animation: gp-spin 0.9s linear infinite;"></div>
+              <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Archivo Black', sans-serif; font-size: 34px; color: #241a0c;">{{ progress }}%</div>
+            </div>
+            <h1 style="margin: 0 0 10px; font-family: 'Archivo Black', sans-serif; font-size: 26px; color: #241a0c;">Adding your shots…</h1>
+            <p style="margin: 0 0 26px; font-size: 15px; color: #6b5c3a;">Hang tight — landing in the roll.</p>
+            <div style="width: 100%; max-width: 280px; height: 10px; border-radius: 9999px; background: rgba(36,26,12,0.08); overflow: hidden;">
+              <div style="height: 100%; width: {{ progressPct }}; border-radius: 9999px; background: linear-gradient(135deg,#FF8A1E,#FF5A00); transition: width .2s ease;"></div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ SUCCESS ══════════ -->
+        <sc-if value="{{ isSuccess }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 70px 34px 44px; display: flex; flex-direction: column; align-items: center; text-align: center; animation: gp-fade .3s ease both;">
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;">
+              <div style="width: 116px; height: 116px; border-radius: 50%; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%); display: flex; align-items: center; justify-content: center; box-shadow: 0 18px 40px rgba(255,106,0,0.42); animation: gp-pop .5s ease both;">
+                <svg width="52" height="52" viewBox="0 0 52 52" fill="none"><path d="M14 27l9 9 16-18" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div>
+                <h1 style="margin: 0 0 12px; font-family: 'Archivo Black', sans-serif; font-size: 38px; letter-spacing: 0.005em; color: #241a0c;">You're in the roll!</h1>
+                <p style="margin: 0; font-size: 16px; color: #6b5c3a; line-height: 1.5; max-width: 280px;">{{ selectedCount }} shots added. Everyone at Lake House can see them now.</p>
+              </div>
+            </div>
+            <div style="width: 100%; display: flex; flex-direction: column; gap: 12px;">
+              <button onClick="{{ goGallery }}" style="border: none; cursor: pointer; padding: 18px; border-radius: 14px; font-family: 'Archivo Black', sans-serif; font-size: 16px; text-transform: uppercase; color: #fff; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%); box-shadow: 0 12px 28px rgba(255,106,0,0.38);" style-active="transform: scale(.97);">See the roll</button>
+              <button onClick="{{ goUpload }}" style="cursor: pointer; padding: 15px; border-radius: 14px; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 13px; letter-spacing: 0.06em; color: #241a0c; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a;" style-active="transform: scale(.97);">ADD MORE</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ GALLERY ══════════ -->
+        <sc-if value="{{ isGallery }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 0 0 90px; animation: gp-fade .35s ease both;">
+            <div style="position: sticky; top: 0; z-index: 3; padding: 60px 22px 12px; background: linear-gradient(#F4E9CE 66%, rgba(244,233,206,0.85) 90%, transparent); backdrop-filter: blur(6px);">
+              <div style="display: flex; align-items: flex-end; gap: 14px;">
+                <button onClick="{{ goLanding }}" style="flex-shrink: 0; width: 40px; height: 40px; border-radius: 11px; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a; color: #241a0c; font-size: 18px; cursor: pointer;" style-active="transform: scale(.92);">←</button>
+                <div>
+                  <div style="font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.16em; color: #c85a12; margin-bottom: 6px;">LAKE HOUSE '26</div>
+                  <h1 style="margin: 0; font-family: 'Archivo Black', sans-serif; font-size: 32px; letter-spacing: 0.005em; color: #241a0c; text-transform: uppercase;">The Roll</h1>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 16px; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700;">
+                <button onClick="{{ setAll }}" style="cursor: pointer; padding: 8px 15px; border-radius: 9px; border: none; color: {{ allText }}; background: {{ allBg }};">ALL 132</button>
+                <button onClick="{{ setMine }}" style="cursor: pointer; padding: 8px 15px; border-radius: 9px; border: none; color: {{ mineText }}; background: {{ mineBg }};">YOURS</button>
+                <button onClick="{{ setLiked }}" style="cursor: pointer; padding: 8px 15px; border-radius: 9px; border: none; color: {{ likedText }}; background: {{ likedBg }};">♥ LIKED</button>
+              </div>
+            </div>
+
+            <div style="column-count: 2; column-gap: 10px; padding: 6px 14px 0;">
+              <sc-for list="{{ displayPhotos }}" as="p" hint-placeholder-count="8">
+                <div data-id="{{ p.id }}" onClick="{{ openViewer }}" style="break-inside: avoid; margin-bottom: 12px; cursor: pointer; position: relative; background: #fff; padding: 6px 6px 8px; border-radius: 3px; box-shadow: 0 6px 15px rgba(90,70,30,0.18);" style-active="transform: scale(.98);">
+                  <div style="position: relative; border-radius: 2px; overflow: hidden; background: {{ p.grad }}; height: {{ p.h }};">
+                    <div style="position: absolute; inset: 0; background: linear-gradient(transparent 60%, rgba(0,0,0,0.4));"></div>
+                    <div style="position: absolute; right: 8px; bottom: 7px; font-family: 'Space Mono', monospace; font-size: 9px; color: #FFD9A8; text-shadow: 0 1px 2px rgba(0,0,0,.5);">{{ p.date }}</div>
+                  </div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 3px 1px;">
+                    <span style="font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: #241a0c;">{{ p.name }}</span>
+                    <span style="display: inline-flex; align-items: center; gap: 3px; font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: {{ p.heartColor }};">♥ {{ p.displayLikes }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <button onClick="{{ goUpload }}" style="position: fixed; z-index: 5; right: 20px; bottom: 44px; width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer; color: #fff; font-size: 30px; font-weight: 700; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%); box-shadow: 0 14px 32px rgba(255,106,0,0.5);" style-active="transform: scale(.9);">+</button>
+          </div>
+        </sc-if>
+
+        <!-- ══════════ HOST DASHBOARD ══════════ -->
+        <sc-if value="{{ isHost }}" hint-placeholder-val="{{ false }}">
+          <div style="min-height: 874px; box-sizing: border-box; padding: 66px 22px 44px; animation: gp-fade .35s ease both;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <button onClick="{{ goWelcome }}" style="width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a; color: #241a0c; font-size: 20px; cursor: pointer;" style-active="transform: scale(.92);">←</button>
+              <div style="font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; color: #c85a12;">ROLL CONTROL</div>
+            </div>
+
+            <h1 style="margin: 20px 0 4px; font-family: 'Archivo Black', sans-serif; font-size: 30px; letter-spacing: 0.005em; color: #241a0c; text-transform: uppercase;">Lake House '26</h1>
+            <p style="margin: 0 0 20px; font-family: 'Space Mono', monospace; color: #8a7a56; font-size: 13px;">Live · closes Jul 8</p>
+
+            <div style="border-radius: 18px; background: rgba(255,255,255,0.55); border: 1px solid #d8c49a; box-shadow: 0 12px 30px rgba(90,70,30,0.14); padding: 18px; display: flex; gap: 16px; align-items: center;">
+              <div style="width: 108px; height: 108px; flex-shrink: 0; border-radius: 12px; background: #fff; padding: 10px; box-sizing: border-box; box-shadow: 0 4px 12px rgba(90,70,30,0.14);">
+                <div style="display: grid; grid-template-columns: repeat(11, 1fr); gap: 1px; width: 100%; height: 100%;">
+                  <sc-for list="{{ qr }}" as="cell" hint-placeholder-count="121">
+                    <div style="background: {{ cell.c }}; border-radius: 1px;"></div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: #8a7a56; margin-bottom: 6px;">GUEST LINK</div>
+                <div style="font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; color: #241a0c; word-break: break-all; margin-bottom: 12px;">gather.photo/lake26</div>
+                <button onClick="{{ copyLink }}" style="cursor: pointer; padding: 9px 16px; border-radius: 9px; border: none; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%);" style-active="transform: scale(.95);">{{ copyLabel }}</button>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+              <div style="flex: 1; border-radius: 16px; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a; padding: 15px;">
+                <div style="font-family: 'Archivo Black', sans-serif; font-size: 26px; color: #FF6A00;">132</div>
+                <div style="font-family: 'Space Mono', monospace; font-size: 11px; color: #8a7a56; margin-top: 3px;">SHOTS</div>
+              </div>
+              <div style="flex: 1; border-radius: 16px; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a; padding: 15px;">
+                <div style="font-family: 'Archivo Black', sans-serif; font-size: 26px; color: #241a0c;">38</div>
+                <div style="font-family: 'Space Mono', monospace; font-size: 11px; color: #8a7a56; margin-top: 3px;">CROWD</div>
+              </div>
+              <div style="flex: 1; border-radius: 16px; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a; padding: 15px;">
+                <div style="font-family: 'Archivo Black', sans-serif; font-size: 26px; color: #241a0c;">1.2k</div>
+                <div style="font-family: 'Space Mono', monospace; font-size: 11px; color: #8a7a56; margin-top: 3px;">LOOKS</div>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin: 26px 0 12px;">
+              <span style="font-family: 'Archivo Black', sans-serif; font-size: 14px; text-transform: uppercase; color: #241a0c;">Moderate</span>
+              <span style="font-family: 'Space Mono', monospace; font-size: 12px; color: #8a7a56;">tap to hide</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+              <sc-for list="{{ modPhotos }}" as="m" hint-placeholder-count="9">
+                <div data-id="{{ m.id }}" onClick="{{ toggleHide }}" style="position: relative; background: #fff; padding: 4px 4px 6px; border-radius: 3px; cursor: pointer; box-shadow: 0 4px 10px rgba(90,70,30,0.14);" style-active="transform: scale(.95);">
+                  <div style="aspect-ratio: 1; border-radius: 2px; overflow: hidden; background: {{ m.grad }}; position: relative;">
+                    <div style="position: absolute; inset: 0; background: rgba(244,233,206,0.82); display: {{ m.hiddenDisplay }}; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; color: #8a7a56; font-size: 11px; font-weight: 700; backdrop-filter: blur(2px);">Hidden</div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+
+            <button onClick="{{ goGallery }}" style="width: 100%; margin-top: 22px; cursor: pointer; padding: 15px; border-radius: 14px; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 13px; letter-spacing: 0.06em; color: #241a0c; background: rgba(255,255,255,0.5); border: 1px solid #d8c49a;" style-active="transform: scale(.98);">VIEW LIVE ROLL</button>
+            <button onClick="{{ goLanding }}" style="width: 100%; margin-top: 10px; background: none; border: none; cursor: pointer; padding: 8px; font-family: 'Space Mono', monospace; font-size: 12px; color: #8a7a56;">Preview guest view &rarr;</button>
+          </div>
+        </sc-if>
+
+      </div>
+
+      <!-- ══════════ PHOTO VIEWER (overlay) ══════════ -->
+      <sc-if value="{{ viewerOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position: absolute; inset: 0; z-index: 40; background: #F4E9CE; display: flex; flex-direction: column; animation: gp-fade .25s ease both;">
+          <div style="position: absolute; inset: 0; pointer-events: none; background: radial-gradient(115% 82% at 6% -8%, rgba(255,138,30,0.16), transparent 52%);"></div>
+          <div style="position: relative; padding: 60px 20px 12px; display: flex; align-items: center; justify-content: space-between;">
+            <button onClick="{{ closeViewer }}" style="width: 44px; height: 44px; border-radius: 12px; background: rgba(255,255,255,0.55); border: 1px solid #d8c49a; color: #241a0c; font-size: 20px; cursor: pointer;" style-active="transform: scale(.92);">✕</button>
+            <div style="display: flex; align-items: center; gap: 9px;">
+              <div style="width: 26px; height: 26px; border-radius: 50%; background: {{ current.grad }};"></div>
+              <span style="font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; color: #241a0c;">{{ current.name }}</span>
+            </div>
+          </div>
+
+          <div style="position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px 22px;">
+            <div style="width: 100%; background: #fff; padding: 12px 12px 40px; border-radius: 4px; box-shadow: 0 24px 50px rgba(90,70,30,0.32); transform: rotate(-1.5deg);">
+              <div style="width: 100%; aspect-ratio: 3/4; background: {{ current.grad }}; position: relative;"><div style="position: absolute; right: 12px; bottom: 10px; font-family: 'Space Mono', monospace; font-size: 11px; color: #FFD9A8;">{{ current.date }}</div></div>
+            </div>
+          </div>
+
+          <div style="position: relative; padding: 16px 22px 40px; display: flex; gap: 12px;">
+            <button onClick="{{ toggleLike }}" style="flex: 1; cursor: pointer; padding: 15px; border-radius: 14px; border: none; font-family: 'Archivo Black', sans-serif; font-size: 15px; text-transform: uppercase; color: {{ likeBtnText }}; background: {{ likeBtnBg }}; box-shadow: {{ likeBtnShadow }};" style-active="transform: scale(.96);">{{ likeBtnLabel }}</button>
+            <button style="width: 56px; cursor: pointer; border-radius: 14px; border: 1px solid #d8c49a; background: rgba(255,255,255,0.55); color: #241a0c; font-size: 20px; display: flex; align-items: center; justify-content: center;" style-active="transform: scale(.94);">↓</button>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </x-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: &quot;460px&quot;, &quot;height&quot;: &quot;930px&quot;}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'welcome',
+    nickname: '',
+    progress: 0,
+    filter: 'all',
+    viewerId: null,
+    liked: {},
+    hidden: {},
+    copied: false,
+    authMode: 'signup',
+    authName: '',
+    authEmail: '',
+    sentTo: '',
+    eventName: "Lake House '26",
+    eventCover: 0,
+  };
+
+  coverGrads = [
+    'linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%)',
+    'linear-gradient(135deg,#17B7A6 0%,#0c5b52 100%)',
+    'linear-gradient(135deg,#E8503B 0%,#8a1c12 100%)',
+    'linear-gradient(135deg,#E9C33C 0%,#a3791c 100%)',
+  ];
+
+  emailValid(v) { return /\S+@\S+\.\S+/.test((v || '').trim()); }
+
+  grads = [
+    'linear-gradient(150deg,#F5852A,#a34a12)',
+    'linear-gradient(150deg,#17B7A6,#0c5b52)',
+    'linear-gradient(150deg,#E8503B,#8a1c12)',
+    'linear-gradient(150deg,#E9C33C,#a3791c)',
+    'linear-gradient(150deg,#FF7A1A,#a34a12)',
+    'linear-gradient(150deg,#3FA7A0,#0e4a44)',
+    'linear-gradient(150deg,#D96A2B,#8a3a10)',
+    'linear-gradient(150deg,#F0A83C,#a3791c)',
+    'linear-gradient(150deg,#C98A3A,#6e3d12)',
+    'linear-gradient(150deg,#2FA79B,#0c5b52)',
+  ];
+
+  photos = [
+    { id: 1,  name: 'Priya',  date: '07·04·26', h: 210, likes: 24, mine: false },
+    { id: 2,  name: 'Marcus', date: '07·04·26', h: 150, likes: 8,  mine: false },
+    { id: 3,  name: 'You',    date: '07·05·26', h: 240, likes: 41, mine: true  },
+    { id: 4,  name: 'Lena',   date: '07·05·26', h: 168, likes: 12, mine: false },
+    { id: 5,  name: 'Sofia',  date: '07·05·26', h: 200, likes: 33, mine: false },
+    { id: 6,  name: 'You',    date: '07·06·26', h: 150, likes: 5,  mine: true  },
+    { id: 7,  name: 'Theo',   date: '07·06·26', h: 226, likes: 58, mine: false },
+    { id: 8,  name: 'Jules',  date: '07·06·26', h: 160, likes: 9,  mine: false },
+    { id: 9,  name: 'Ren',    date: '07·06·26', h: 190, likes: 17, mine: false },
+    { id: 10, name: 'You',    date: '07·07·26', h: 210, likes: 22, mine: true  },
+    { id: 11, name: 'Ana',    date: '07·07·26', h: 150, likes: 6,  mine: false },
+    { id: 12, name: 'Kofi',   date: '07·07·26', h: 232, likes: 47, mine: false },
+    { id: 13, name: 'Mia',    date: '07·07·26', h: 172, likes: 14, mine: false },
+    { id: 14, name: 'Sam',    date: '07·07·26', h: 196, likes: 28, mine: false },
+  ];
+
+  qrPattern = null;
+
+  grad(id) { return this.grads[(id - 1) % this.grads.length]; }
+
+  buildQR() {
+    const N = 11, cells = [];
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        const corner = (rr, cc) => rr < 3 && cc < 3;
+        let on;
+        if (corner(r, c) || corner(r, N - 1 - c) || corner(N - 1 - r, c)) {
+          on = true;
+        } else {
+          on = ((r * 7 + c * 13 + r * c * 3) % 5) < 2;
+        }
+        cells.push({ c: on ? '#241a0c' : 'transparent' });
+      }
+    }
+    return cells;
+  }
+
+  clearTimer() { if (this._t) { clearInterval(this._t); this._t = null; } }
+  componentWillUnmount() { this.clearTimer(); }
+
+  go(screen) { this.clearTimer(); this.setState({ screen }); }
+
+  startUpload = () => {
+    this.clearTimer();
+    this.setState({ screen: 'uploading', progress: 0 });
+    this._t = setInterval(() => {
+      this.setState(s => {
+        const next = Math.min(100, s.progress + (6 + Math.floor(Math.random() * 8)));
+        if (next >= 100) {
+          this.clearTimer();
+          setTimeout(() => this.setState({ screen: 'success' }), 450);
+        }
+        return { progress: next };
+      });
+    }, 180);
+  };
+
+  renderVals() {
+    const s = this.state;
+    if (!this.qrPattern) this.qrPattern = this.buildQR();
+
+    const chip = (active) => ({
+      bg: active ? 'linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%)' : 'rgba(255,255,255,0.5)',
+      text: active ? '#fff' : '#8a7a56',
+    });
+    const all = chip(s.filter === 'all');
+    const mine = chip(s.filter === 'mine');
+    const likedc = chip(s.filter === 'liked');
+
+    const decorate = (p) => {
+      const isLiked = !!s.liked[p.id];
+      return {
+        ...p,
+        grad: this.grad(p.id),
+        h: p.h + 'px',
+        displayLikes: p.likes + (isLiked ? 1 : 0),
+        heartColor: isLiked ? '#E8503B' : '#8a7a56',
+      };
+    };
+
+    let list = this.photos;
+    if (s.filter === 'mine') list = this.photos.filter(p => p.mine);
+    else if (s.filter === 'liked') list = this.photos.filter(p => s.liked[p.id]);
+    const displayPhotos = list.map(decorate);
+
+    const cur = this.photos.find(p => p.id === s.viewerId);
+    const curLiked = cur ? !!s.liked[cur.id] : false;
+    const current = cur ? { ...cur, grad: this.grad(cur.id) } : { name: '', date: '', grad: '#ccc' };
+
+    const gated = (ok) => ({
+      bg: ok ? 'linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%)' : 'rgba(36,26,12,0.08)',
+      shadow: ok ? '0 12px 28px rgba(255,106,0,0.38)' : 'none',
+      opacity: ok ? 1 : 0.5,
+    });
+    const signupReady = s.authName.trim().length > 0 && this.emailValid(s.authEmail);
+    const loginReady = this.emailValid(s.authEmail);
+    const createReady = s.eventName.trim().length > 0;
+    const su = gated(signupReady), li = gated(loginReady), ce = gated(createReady);
+
+    const coverSwatches = this.coverGrads.map((g, i) => ({
+      idx: i,
+      grad: g,
+      ring: s.eventCover === i ? '0 0 0 3px #F4E9CE, 0 0 0 5px #FF6A00' : '0 4px 10px rgba(90,70,30,0.16)',
+    }));
+
+    const nameEmpty = s.nickname.trim().length === 0;
+    const selectedTray = [1, 4, 7, 2].map(id => ({ grad: this.grad(id) }));
+    const modPhotos = this.photos.slice(0, 9).map(p => ({
+      id: p.id,
+      grad: this.grad(p.id),
+      hiddenDisplay: s.hidden[p.id] ? 'flex' : 'none',
+    }));
+
+    return {
+      isWelcome: s.screen === 'welcome',
+      isSignup: s.screen === 'signup',
+      isLogin: s.screen === 'login',
+      isCheckEmail: s.screen === 'checkEmail',
+      isCreateEvent: s.screen === 'createEvent',
+      isLanding: s.screen === 'landing',
+      isName: s.screen === 'name',
+      isUpload: s.screen === 'upload',
+      isUploading: s.screen === 'uploading',
+      isSuccess: s.screen === 'success',
+      isGallery: s.screen === 'gallery',
+      isHost: s.screen === 'host',
+      viewerOpen: s.viewerId !== null,
+
+      nickname: s.nickname,
+      initial: s.nickname.trim() ? s.nickname.trim()[0].toUpperCase() : '?',
+      displayName: s.nickname.trim() || 'guest',
+      nameEmpty,
+      continueBg: nameEmpty ? 'rgba(36,26,12,0.08)' : 'linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%)',
+      continueShadow: nameEmpty ? 'none' : '0 12px 28px rgba(255,106,0,0.38)',
+      continueOpacity: nameEmpty ? 0.5 : 1,
+
+      progress: s.progress,
+      progressPct: s.progress + '%',
+      selectedCount: 4,
+      selectedTray,
+
+      displayPhotos,
+      allBg: all.bg, allText: all.text,
+      mineBg: mine.bg, mineText: mine.text,
+      likedBg: likedc.bg, likedText: likedc.text,
+
+      current,
+      likeBtnLabel: curLiked ? '♥ Liked · ' + (cur ? cur.likes + 1 : 0) : '♥ Like',
+      likeBtnBg: curLiked ? 'linear-gradient(135deg,#FF8A1E 0%,#FF5A00 100%)' : 'rgba(255,255,255,0.55)',
+      likeBtnText: curLiked ? '#fff' : '#241a0c',
+      likeBtnShadow: curLiked ? '0 10px 24px rgba(255,106,0,0.36)' : 'none',
+
+      qr: this.qrPattern,
+      modPhotos,
+      copyLabel: s.copied ? 'Copied ✓' : 'Copy link',
+
+      authName: s.authName,
+      authEmail: s.authEmail,
+      sentTo: s.sentTo,
+      signupBg: su.bg, signupShadow: su.shadow, signupOpacity: su.opacity,
+      loginBg: li.bg, loginShadow: li.shadow, loginOpacity: li.opacity,
+      createBg: ce.bg, createShadow: ce.shadow, createOpacity: ce.opacity,
+      eventName: s.eventName,
+      eventPreviewName: s.eventName.trim() || "Your event",
+      eventCoverGrad: this.coverGrads[s.eventCover],
+      coverSwatches,
+
+      goWelcome: () => this.go('welcome'),
+      goSignup: () => this.setState({ screen: 'signup', authMode: 'signup' }),
+      goLogin: () => this.setState({ screen: 'login', authMode: 'login' }),
+      onAuthName: (e) => this.setState({ authName: e.target.value }),
+      onAuthEmail: (e) => this.setState({ authEmail: e.target.value }),
+      sendLink: () => {
+        const ok = s.authMode === 'signup' ? signupReady : loginReady;
+        if (!ok) return;
+        this.setState({ screen: 'checkEmail', sentTo: s.authEmail.trim() });
+      },
+      goBackAuth: () => this.go(s.authMode === 'signup' ? 'signup' : 'login'),
+      continueFromEmail: () => this.go(s.authMode === 'signup' ? 'createEvent' : 'host'),
+      googleAuth: () => this.setState({ screen: s.authMode === 'signup' ? 'createEvent' : 'host', sentTo: 'you@gmail.com' }),
+      onEventName: (e) => this.setState({ eventName: e.target.value }),
+      setCover: (e) => this.setState({ eventCover: Number(e.currentTarget.dataset.idx) }),
+      createEvent: () => { if (createReady) this.go('host'); },
+
+      goStart: () => this.go(s.nickname.trim() ? 'upload' : 'name'),
+      goLanding: () => this.go('landing'),
+      goName: () => this.go('name'),
+      goUpload: () => this.go('upload'),
+      goGallery: () => this.go('gallery'),
+      goHost: () => this.go('host'),
+      onName: (e) => this.setState({ nickname: e.target.value }),
+      addOne: () => {},
+      startUpload: this.startUpload,
+      setAll: () => this.setState({ filter: 'all' }),
+      setMine: () => this.setState({ filter: 'mine' }),
+      setLiked: () => this.setState({ filter: 'liked' }),
+      openViewer: (e) => this.setState({ viewerId: Number(e.currentTarget.dataset.id) }),
+      closeViewer: () => this.setState({ viewerId: null }),
+      toggleLike: () => this.setState(st => ({ liked: { ...st.liked, [st.viewerId]: !st.liked[st.viewerId] } })),
+      toggleHide: (e) => { const id = Number(e.currentTarget.dataset.id); this.setState(st => ({ hidden: { ...st.hidden, [id]: !st.hidden[id] } })); },
+      copyLink: () => { this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1600); },
+    };
+  }
+}
+</script>
+</body>
+</html>

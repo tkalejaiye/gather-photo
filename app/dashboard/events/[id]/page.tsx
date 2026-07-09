@@ -150,7 +150,9 @@ export default async function EventDetailPage({
             href={`/e/${event.slug}`}
             className="hidden shrink-0 items-center gap-1.5 rounded-[12px] bg-daylight-orange-grad px-5 py-3 font-display text-[13px] uppercase text-white shadow-[0_10px_24px_rgba(255,106,0,0.32)] transition active:scale-[0.97] lg:inline-flex"
           >
-            View live roll ↗
+            {/* ︎ forces text presentation — U+2197 alone may render as
+                an emoji arrow on Apple platforms. */}
+            View live roll {"↗︎"}
           </Link>
         </header>
 
@@ -194,7 +196,9 @@ export default async function EventDetailPage({
                 className={daylightButtonClasses("secondary", "w-full")}
                 aria-label="Download all photos as ZIP"
               >
-                ⬇ DOWNLOAD ZIP
+                {/* U+2193, not U+2B07 — the latter defaults to emoji
+                    presentation on iOS (blue square). */}
+                ↓ DOWNLOAD ZIP
               </a>
             )}
           </div>

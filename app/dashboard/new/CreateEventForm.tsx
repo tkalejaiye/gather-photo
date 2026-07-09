@@ -68,11 +68,17 @@ export function CreateEventForm({ error }: { error: string | null }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
+        {/* iOS Safari gives date inputs an intrinsic width/height that
+            ignores w-full and overflows the column; appearance-none makes it
+            size like a normal field, min-h matches the text fields (an empty
+            date renders no value to derive height from), and the shadow-DOM
+            value is centered by default on iOS — pin it left. */}
         <Field
           label="Date (optional)"
           name="event_date"
           type="date"
           className="mt-4"
+          inputClassName="block min-h-[56px] appearance-none [&::-webkit-date-and-time-value]:text-left"
         />
         <Field
           label="PIN (optional, 4–8 digits)"

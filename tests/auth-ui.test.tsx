@@ -52,6 +52,21 @@ describe("marketing landing (/)", () => {
     expect(html).toContain("Create host account");
     expect(html).toContain("LOG IN");
   });
+
+  // FRI-43 — lg+ D1 brand-panel hero alongside the unchanged mobile stack.
+  it("carries the lg+ D1 hero: panel gradient, proof stats, on-orange CTAs", () => {
+    const html = renderToStaticMarkup(<Home />);
+    // The D1 panel signature (same gradient as the /sign-in aside).
+    expect(html).toContain("linear-gradient(160deg,#FF8A1E 0%,#FF5A00 60%,#e24e00 100%)");
+    expect(html).toContain("FOR GUESTS");
+    expect(html).toContain("FOR THE WHOLE CROWD");
+    // Both stacks (mobile + desktop hero) link both auth modes.
+    expect(html.match(/\/sign-in\?mode=signup/g)).toHaveLength(2);
+    expect(html.match(/\/sign-in\?mode=login/g)).toHaveLength(2);
+    // Hero CTAs use the on-orange variants, not the gradient/paper pair.
+    expect(html).toContain("bg-white font-display");
+    expect(html).toContain("border-white/25");
+  });
 });
 
 describe("sign-in page", () => {

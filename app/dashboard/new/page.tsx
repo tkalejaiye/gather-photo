@@ -20,7 +20,7 @@ export default async function NewEventPage({ searchParams }: Props) {
 
   return (
     <ScreenShell contentClassName="lg:items-center lg:justify-center">
-      <main className="mx-auto flex min-h-dvh w-full max-w-[440px] flex-col px-[26px] pb-10 pt-[54px] lg:min-h-0 lg:flex-none lg:py-14">
+      <main className="mx-auto flex min-h-svh w-full max-w-[440px] flex-col px-[26px] pb-10 pt-[54px] lg:min-h-0 lg:flex-none lg:py-14">
         <Link
           href="/dashboard"
           aria-label="Back to your events"

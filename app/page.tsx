@@ -16,7 +16,7 @@ export default function Home() {
     <ScreenShell>
       <main className="flex flex-1 flex-col">
         {/* < lg: Welcome stack (mock screen 8). */}
-        <div className="mx-auto flex min-h-dvh w-full max-w-[440px] flex-col px-[26px] pb-11 pt-[74px] lg:hidden">
+        <div className="mx-auto flex min-h-svh w-full max-w-[440px] flex-col px-[26px] pb-11 pt-[74px] lg:hidden">
           <Wordmark />
 
           <div className="flex flex-1 flex-col justify-center gap-[22px] py-10">

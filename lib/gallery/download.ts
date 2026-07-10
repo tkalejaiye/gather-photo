@@ -28,17 +28,22 @@ export type DownloadMediaRow = {
   created_at: string;
 };
 
-// Walk the event's active media newest-first, one page at a time. Kept as an
-// async generator so the caller can await each page, stream it into the ZIP,
-// and *then* fetch the next — memory stays flat regardless of gallery size.
-// RLS on `media` scopes rows to events owned by the caller; the route's
+// Walk the event's downloadable media newest-first, one page at a time. Kept
+// as an async generator so the caller can await each page, stream it into the
+// ZIP, and *then* fetch the next — memory stays flat regardless of gallery
+// size. RLS on `media` scopes rows to events owned by the caller; the route's
 // ownsEvent() precheck exists so a foreign id 404s rather than serving an
 // empty ZIP.
-export async function* iterateActiveMedia(
+//
+// FRI-30: the default ZIP is the public roll — approved only. The host can
+// opt pending (not-yet-approved) shots in; rejected rows never export.
+export async function* iterateDownloadableMedia(
   supabase: SupabaseClient,
   eventId: string,
   batchSize: number = DOWNLOAD_BATCH_SIZE,
+  { includePending = false }: { includePending?: boolean } = {},
 ): AsyncGenerator<DownloadMediaRow[], void, void> {
+  const statuses = includePending ? ["pending", "approved"] : ["approved"];
   let offset = 0;
   // Loop bound: each page returns ≤ batchSize rows. When Postgres returns a
   // short page we're done. `while (true)` with an explicit break beats a
@@ -48,7 +53,7 @@ export async function* iterateActiveMedia(
       .from("media")
       .select("id, storage_path, uploader_token, uploader_name, created_at")
       .eq("event_id", eventId)
-      .eq("status", "active")
+      .in("status", statuses)
       // Photos-only per TECH_SPEC §1 — the outer ZIP filename literally
       // says `-photos-`, and if the video lane ever lands the export
       // format for it should be a separate decision, not a filename lie.

@@ -21,6 +21,7 @@ type MediaRow = {
   height: number | null;
   bytes: number | null;
   created_at: string;
+  status: "pending" | "approved" | "rejected";
 };
 
 const state: {
@@ -29,6 +30,8 @@ const state: {
   media: MediaRow[];
   lastMediaQuery: {
     eventId?: string;
+    statusEq?: string;
+    statusIn?: string[];
     uploaderEq?: string;
     uploaderIsNull?: boolean;
     rangeFrom?: number;
@@ -79,7 +82,8 @@ function eventsSelectChain(_cols: string) {
 function mediaSelectChain(_cols: string) {
   const filters: {
     eventId?: string;
-    status?: string;
+    statusEq?: string;
+    statusIn?: string[];
     uploaderEq?: string;
     uploaderIsNull?: boolean;
   } = {};
@@ -88,8 +92,12 @@ function mediaSelectChain(_cols: string) {
   const api = {
     eq(col: string, val: string) {
       if (col === "event_id") filters.eventId = val;
-      if (col === "status") filters.status = val;
+      if (col === "status") filters.statusEq = val;
       if (col === "uploader_token") filters.uploaderEq = val;
+      return api;
+    },
+    in(col: string, vals: string[]) {
+      if (col === "status") filters.statusIn = vals;
       return api;
     },
     is(col: string, val: unknown) {
@@ -104,6 +112,8 @@ function mediaSelectChain(_cols: string) {
       // Capture the query shape so tests can assert against it.
       state.lastMediaQuery = {
         eventId: filters.eventId,
+        statusEq: filters.statusEq,
+        statusIn: filters.statusIn,
         uploaderEq: filters.uploaderEq,
         uploaderIsNull: filters.uploaderIsNull,
         rangeFrom: from,
@@ -117,8 +127,10 @@ function mediaSelectChain(_cols: string) {
       let rows = state.media.filter(
         (r) => r.storage_path.startsWith(`events/${filters.eventId}/`),
       );
-      // Emulate status='active' — all seeded rows are active in these tests.
-      if (filters.status && filters.status !== "active") rows = [];
+      // FRI-30 status semantics: .eq narrows to one status, .in to a set.
+      if (filters.statusEq) rows = rows.filter((r) => r.status === filters.statusEq);
+      if (filters.statusIn)
+        rows = rows.filter((r) => filters.statusIn!.includes(r.status));
       if (filters.uploaderEq !== undefined) {
         rows = rows.filter((r) => r.uploader_token === filters.uploaderEq);
       } else if (filters.uploaderIsNull) {
@@ -208,6 +220,7 @@ function seedRows(eventId: string, count: number, seed: (i: number) => Partial<M
       bytes: 250_000,
       // Ascending created_at so the newest row sorts to index 0 under DESC.
       created_at: new Date(2026, 5, 1, 0, 0, i).toISOString(),
+      status: "approved",
     };
     state.media.push({ ...base, ...seed(i) });
   }
@@ -369,5 +382,61 @@ describe("GET /api/events/[id]/media", () => {
     expect(page.items).toHaveLength(5);
     expect(page.hasMore).toBe(false);
     expect(page.nextOffset).toBeNull();
+  });
+
+  // ---- FRI-30 approval visibility ----------------------------------------
+
+  it("serves pending AND approved (never rejected) by default, with status on each item", async () => {
+    state.user = { id: "host-1" };
+    state.ownedEventIds.add("evt-1");
+    seedRows("evt-1", 6, (i) => ({
+      status: i < 2 ? "pending" : i < 5 ? "approved" : "rejected",
+    }));
+
+    const res = await mediaGET(req("http://localhost/api/events/evt-1/media"), {
+      params: { id: "evt-1" },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: { id: string; status: string }[] };
+    // 2 pending + 3 approved; the rejected row never leaves the DB.
+    expect(body.items).toHaveLength(5);
+    for (const item of body.items) {
+      expect(["pending", "approved"]).toContain(item.status);
+    }
+    // Host default reaches the DB as an IN over the host-visible pair.
+    expect(state.lastMediaQuery.statusIn).toEqual(["pending", "approved"]);
+  });
+
+  it("narrows to the moderation queue with ?status=pending", async () => {
+    state.user = { id: "host-1" };
+    state.ownedEventIds.add("evt-1");
+    seedRows("evt-1", 4, (i) => ({ status: i % 2 === 0 ? "pending" : "approved" }));
+
+    const res = await mediaGET(
+      req("http://localhost/api/events/evt-1/media?status=pending"),
+      { params: { id: "evt-1" } },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: { status: string }[] };
+    expect(body.items).toHaveLength(2);
+    for (const item of body.items) expect(item.status).toBe("pending");
+    // Narrowed status uses .eq so the covering index prefix serves it.
+    expect(state.lastMediaQuery.statusEq).toBe("pending");
+  });
+
+  it("rejects ?status values outside the host-visible pair", async () => {
+    state.user = { id: "host-1" };
+    state.ownedEventIds.add("evt-1");
+    seedRows("evt-1", 2, () => ({ status: "rejected" }));
+
+    // 'rejected' must not be reachable through the API — soft-deleted rows
+    // stay invisible even to the owning host's client.
+    for (const bad of ["rejected", "deleted", "active", "anything"]) {
+      const res = await mediaGET(
+        req(`http://localhost/api/events/evt-1/media?status=${bad}`),
+        { params: { id: "evt-1" } },
+      );
+      expect(res.status).toBe(400);
+    }
   });
 });

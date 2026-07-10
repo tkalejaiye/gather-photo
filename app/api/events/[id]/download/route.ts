@@ -4,16 +4,18 @@ import { createClient } from "@/lib/supabase/server";
 import { ownsEvent } from "@/lib/gallery/queries";
 import {
   DOWNLOAD_BATCH_SIZE,
-  iterateActiveMedia,
+  iterateDownloadableMedia,
   signPathsForDownload,
   zipDownloadFilename,
   zipEntryName,
 } from "@/lib/gallery/download";
 
-// GET /api/events/[id]/download
-// FRI-18 / TECH_SPEC §6 §10 · Host-only, streamed ZIP of the event's active
-// media in the originally-uploaded quality. Delivered as `Content-Disposition:
+// GET /api/events/[id]/download?include=pending
+// FRI-18 / TECH_SPEC §6 §10 · Host-only, streamed ZIP of the event's media
+// in the originally-uploaded quality. Delivered as `Content-Disposition:
 // attachment` so a plain `<a href>` triggers a browser download.
+// FRI-30: exports approved media by default; `?include=pending` adds the
+// not-yet-approved queue (host-only route, so no exposure widening).
 //
 // Streaming shape:
 //   1. Walk active media in pages of DOWNLOAD_BATCH_SIZE — never load the
@@ -49,7 +51,7 @@ const ARCHIVER_OPTS = {
 } as const;
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: { id: string } },
 ) {
   const supabase = createClient();
@@ -83,6 +85,12 @@ export async function GET(
   const slug = eventRow?.slug ?? params.id;
   const filename = zipDownloadFilename(slug, new Date());
 
+  // FRI-30: `?include=pending` opts the un-reviewed queue into the export.
+  // Anything other than the exact value falls back to the safe default
+  // (approved only) — a typo shouldn't widen the export.
+  const includePending =
+    new URL(req.url).searchParams.get("include") === "pending";
+
   const archive = archiver("zip", ARCHIVER_OPTS);
 
   // Producer: walk media, sign each page, drain items serially into the
@@ -95,10 +103,11 @@ export async function GET(
     // prefix + same uploader + same date) still produces a unique entry.
     const seenNames = new Set<string>();
     try {
-      for await (const page of iterateActiveMedia(
+      for await (const page of iterateDownloadableMedia(
         supabase,
         params.id,
         DOWNLOAD_BATCH_SIZE,
+        { includePending },
       )) {
         const paths = page.map((r) => r.storage_path);
         const urls = await signPathsForDownload(paths);

@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 
-// FRI-18 acceptance tests for the streamed ZIP download.
+// FRI-18 acceptance tests for the streamed ZIP download, revised by FRI-30.
 //   - Auth: unauthenticated → 401; foreign event id → 404 (RLS-shaped).
-//   - Correctness: ZIP contains an entry for every ACTIVE media row and
-//     none for deleted rows; entry names follow the by-<uploader>/... rule.
+//   - Correctness: the default ZIP contains an entry for every APPROVED
+//     media row and none for pending/rejected rows (public export = the
+//     public roll); `?include=pending` opts the moderation queue in; entry
+//     names follow the by-<uploader>/... rule.
 //   - Streaming: each entry's HTTP fetch is issued only AFTER the previous
 //     entry is drained into the archive — this is what keeps memory flat
 //     on a large event, so a regression here is a spec bug, not a perf nit.
@@ -23,7 +25,7 @@ type MediaRow = {
   uploader_token: string | null;
   uploader_name: string | null;
   created_at: string;
-  status: "active" | "deleted";
+  status: "pending" | "approved" | "rejected";
 };
 
 type FetchLog = {
@@ -89,13 +91,17 @@ function eventsSelectChain(cols: string) {
 }
 
 function mediaSelectChain(_cols: string) {
-  const filters: { eventId?: string; status?: string } = {};
+  const filters: { eventId?: string; status?: string; statusIn?: string[] } = {};
   let orderApplied = false;
 
   const api = {
     eq(col: string, val: string) {
       if (col === "event_id") filters.eventId = val;
       if (col === "status") filters.status = val;
+      return api;
+    },
+    in(col: string, vals: string[]) {
+      if (col === "status") filters.statusIn = vals;
       return api;
     },
     order(_col: string, _opts: unknown) {
@@ -114,7 +120,8 @@ function mediaSelectChain(_cols: string) {
         .filter(
           (r) =>
             r.event_id === filters.eventId &&
-            (filters.status ? r.status === filters.status : true),
+            (filters.status ? r.status === filters.status : true) &&
+            (filters.statusIn ? filters.statusIn.includes(r.status) : true),
         )
         .sort((a, b) => {
           if (a.created_at !== b.created_at) return a.created_at > b.created_at ? -1 : 1;
@@ -225,7 +232,7 @@ function req(url: string): Request {
   return new Request(url);
 }
 
-function seedActive(
+function seedApproved(
   eventId: string,
   n: number,
   seed: (i: number) => Partial<MediaRow> = () => ({}),
@@ -239,7 +246,7 @@ function seedActive(
       uploader_name: null,
       // Ascending real time so DESC sort gives the newest last in seed order.
       created_at: new Date(2026, 5, 1, 0, 0, i).toISOString(),
-      status: "active",
+      status: "approved",
     };
     state.media.push({ ...base, ...seed(i) });
   }
@@ -312,14 +319,16 @@ describe("GET /api/events/[id]/download", () => {
     expect(res.status).toBe(404);
   });
 
-  it("streams a ZIP that contains every active media row and none of the deleted ones", async () => {
+  it("streams a ZIP of approved media only — pending and rejected stay out by default", async () => {
     state.user = { id: "host-1" };
     state.ownedEventIds.add("evt-1");
     state.eventSlug.set("evt-1", "sample-wedding");
-    seedActive("evt-1", 7);
-    // Mark two rows as deleted — they must NOT appear in the ZIP.
-    state.media[1].status = "deleted";
-    state.media[5].status = "deleted";
+    seedApproved("evt-1", 7);
+    // FRI-30: rejected (soft-deleted) rows must NOT appear in any ZIP;
+    // pending rows are excluded from the DEFAULT export.
+    state.media[1].status = "rejected";
+    state.media[5].status = "rejected";
+    state.media[3].status = "pending";
 
     const res = await downloadGET(
       req("http://localhost/api/events/evt-1/download"),
@@ -338,18 +347,37 @@ describe("GET /api/events/[id]/download", () => {
     expect(buf[0]).toBe(0x50);
     expect(buf[1]).toBe(0x4b);
     const names = readZipEntryNames(buf);
-    expect(names).toHaveLength(5); // 7 seeded − 2 deleted
+    expect(names).toHaveLength(4); // 7 seeded − 2 rejected − 1 pending
     // Every entry belongs to `anonymous/` (no uploader token seeded).
     for (const name of names) expect(name.startsWith("anonymous/")).toBe(true);
     // Every entry preserves the .jpg extension.
     for (const name of names) expect(name.endsWith(".jpg")).toBe(true);
   });
 
+  it("includes pending (never rejected) when ?include=pending is passed", async () => {
+    state.user = { id: "host-1" };
+    state.ownedEventIds.add("evt-1");
+    state.eventSlug.set("evt-1", "sample-wedding");
+    seedApproved("evt-1", 5);
+    state.media[0].status = "pending";
+    state.media[1].status = "pending";
+    state.media[4].status = "rejected";
+
+    const res = await downloadGET(
+      req("http://localhost/api/events/evt-1/download?include=pending"),
+      { params: { id: "evt-1" } },
+    );
+    expect(res.status).toBe(200);
+    const buf = new Uint8Array(await res.arrayBuffer());
+    const names = readZipEntryNames(buf);
+    expect(names).toHaveLength(4); // 2 approved + 2 pending; rejected stays out
+  });
+
   it("groups entries by uploader with safe folder names", async () => {
     state.user = { id: "host-1" };
     state.ownedEventIds.add("evt-1");
     state.eventSlug.set("evt-1", "wedding");
-    seedActive("evt-1", 4, (i) => ({
+    seedApproved("evt-1", 4, (i) => ({
       uploader_token: i < 2 ? "guest-a" : null,
       uploader_name: i < 2 ? "Adé Öla!!" : null,
     }));
@@ -374,7 +402,7 @@ describe("GET /api/events/[id]/download", () => {
     state.user = { id: "host-1" };
     state.ownedEventIds.add("evt-1");
     state.eventSlug.set("evt-1", "evt");
-    seedActive("evt-1", 3);
+    seedApproved("evt-1", 3);
     state.missingObjects.add("events/evt-1/photo-0001.jpg");
     const res = await downloadGET(
       req("http://localhost/api/events/evt-1/download"),
@@ -394,7 +422,7 @@ describe("GET /api/events/[id]/download", () => {
     // but well inside the DOWNLOAD_BATCH_SIZE (200), so this fits in a
     // single signing round trip. If the route ever begins parallelising
     // its fetches, maxConcurrent would jump above 1 and this test fails.
-    seedActive("evt-1", 50);
+    seedApproved("evt-1", 50);
     await downloadGET(
       req("http://localhost/api/events/evt-1/download"),
       { params: { id: "evt-1" } },
@@ -407,7 +435,7 @@ describe("GET /api/events/[id]/download", () => {
     state.user = { id: "host-1" };
     state.ownedEventIds.add("evt-1");
     state.eventSlug.set("evt-1", "evt");
-    seedActive("evt-1", 1);
+    seedApproved("evt-1", 1);
     await downloadGET(
       req("http://localhost/api/events/evt-1/download"),
       { params: { id: "evt-1" } },

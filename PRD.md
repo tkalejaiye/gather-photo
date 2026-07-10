@@ -52,7 +52,7 @@ Native iOS/Android apps · iOS App Clips · video transcoding/streaming · AI fa
 
 1. **Event creation** — host auth (email magic link + Google OAuth), create event, unguessable slug, optional PIN, upload window + storage expiry.
 2. **Guest upload (critical path)** — no-login web page; camera capture or multi-select; **client-side compression**; **offline-first queue (IndexedDB)**; **resumable uploads (TUS)** with retry/backoff; visible per-item + overall progress.
-3. **Host gallery** — grid view, uploader attribution, delete/moderation, **one-click ZIP download** in original (uploaded) quality.
+3. **Host gallery** — grid view, uploader attribution, delete/moderation with a **pending → host-approved review queue** (uploads stay hidden from any guest-facing surface until approved; per-event auto-approve opt-out), **one-click ZIP download** in original (uploaded) quality.
 4. **Payments** — Paystack checkout in naira (card/Verve, bank transfer, USSD); webhook-confirmed activation; tiered by guest band.
 5. **Sharing** — QR code generation + printable card; WhatsApp share link.
 6. **Privacy** — private by unguessable slug (+ optional PIN); signed URLs; host-only bulk download; scheduled expiry cleanup.
@@ -76,6 +76,6 @@ Ship through gallery + download (no payments yet), run at 2–5 real events char
 ## 11. Open questions
 
 1. Video in MVP? (Recommend no, or raw + hard cap.)
-2. Guests view the gallery, or host-only? (Recommend a simple guest view to drive WhatsApp reshare.)
+2. Guests view the gallery, or host-only? **Decided (FRI-30/FRI-37): guests will get a shared gallery showing host-approved photos only** — approval shipped first so the guest view inherits a safe default.
 3. Sell to couples or photographers first? (Recommend a vendor-friendly model early.)
 4. Final pricing tiers (after demand test).

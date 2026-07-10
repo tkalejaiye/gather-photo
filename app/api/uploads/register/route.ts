@@ -7,7 +7,7 @@ import { checkRateLimit } from "@/lib/upload/rate-limit";
 //   slug, path, bytes, width?, height?, contentHash,
 //   uploaderToken, uploaderName?
 // }
-// Returns: { mediaId, duplicate: boolean }
+// Returns: { mediaId, duplicate: boolean, status: 'pending' | 'approved' }
 //
 // Called AFTER the client PUTs the blob to the signed URL. Inserts the
 // `media` row so the host gallery can see the photo. Re-validates that the
@@ -147,6 +147,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Uploaded object not found." }, { status: 400 });
   }
 
+  // FRI-30: uploads await host approval before anything public can see
+  // them. Explicit here (not just the column default) so the moderation
+  // policy is visible at the insert site; auto_approve is the host's
+  // per-event opt-out of moderating.
+  const status = event.auto_approve ? "approved" : "pending";
+
   const { data, error } = await supabase
     .from("media")
     .insert({
@@ -159,6 +165,7 @@ export async function POST(req: Request) {
       width,
       height,
       content_hash: contentHash,
+      status,
     })
     .select("id")
     .single();
@@ -183,7 +190,7 @@ export async function POST(req: Request) {
     if (code === "23505") {
       const { data: existing } = await supabase
         .from("media")
-        .select("id, storage_path")
+        .select("id, storage_path, status")
         .eq("event_id", event.id)
         .eq("content_hash", contentHash)
         .maybeSingle();
@@ -196,6 +203,11 @@ export async function POST(req: Request) {
       return NextResponse.json({
         mediaId: existing?.id ?? null,
         duplicate: true,
+        // The EXISTING row's status is authoritative on a retry — the host
+        // may already have approved (or rejected) it since the first
+        // registration. Fall back to the would-be insert status only if
+        // the row vanished between the 23505 and the re-read.
+        status: existing?.status ?? status,
       });
     }
     return NextResponse.json(
@@ -204,5 +216,7 @@ export async function POST(req: Request) {
     );
   }
 
-  return NextResponse.json({ mediaId: data.id, duplicate: false });
+  // `status` rides along so the guest UI can distinguish "in the roll" from
+  // "awaiting host approval" without another round-trip (FRI-37 will use it).
+  return NextResponse.json({ mediaId: data.id, duplicate: false, status });
 }

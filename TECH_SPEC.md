@@ -41,7 +41,9 @@ Paystack ──webhook──▶ Next.js route → mark paid / activate event (id
 
 ## 4. Data model
 
-See `supabase/migrations/0001_init.sql` for the authoritative schema. Tables: `profiles` (hosts), `events` (slug, pin, tier, windows, status), `media` (event_id, uploader_token/name, storage_path, kind, bytes, content_hash, status), `payments` (paystack_ref, amount_kobo, channel, status). RLS isolates hosts to their own rows; guests never read the DB directly.
+See `supabase/migrations/0001_init.sql` for the authoritative schema (`0005_approval.sql` revises media statuses). Tables: `profiles` (hosts), `events` (slug, pin, tier, windows, status, `auto_approve`), `media` (event_id, uploader_token/name, storage_path, kind, bytes, content_hash, status), `payments` (paystack_ref, amount_kobo, channel, status). RLS isolates hosts to their own rows; guests never read the DB directly.
+
+**Photo approval (FRI-30):** `media.status ∈ {pending, approved, rejected}`. `/api/uploads/register` inserts `pending` (or `approved` when the event's `auto_approve` is on — default off). Host moderation moves `pending → approved` (approve/un-hide) and anything → `rejected` (the FRI-17 soft-delete, renamed). Visibility: **public/guest surfaces serve `approved` only**; an uploader additionally sees their own `pending` rows (matched by `uploader_token`); the host sees `pending + approved` (the moderation queue); `rejected` is invisible everywhere and reclaimed by the `storage_expires_at` sweep.
 
 ## 5. Critical path — offline-first guest upload (build & test first)
 
@@ -53,7 +55,7 @@ Module contracts (see `lib/`): `image/compress.ts` `compress(file) → Blob`; `u
 
 ## 6. Host flow
 
-Sign up (email magic link, or Google OAuth behind `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED`) → create event (name/date/PIN/tier) → pay (Paystack) → event `active`, windows set → get QR + link, one-tap WhatsApp share, printable QR card → dashboard: grid, counts, filter by uploader, delete, Download-all ZIP.
+Sign up (email magic link, or Google OAuth behind `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED`) → create event (name/date/PIN/tier) → pay (Paystack) → event `active`, windows set → get QR + link, one-tap WhatsApp share, printable QR card → dashboard: grid, counts, filter by uploader, moderation (approve/hide pending uploads — single + bulk — plus delete), auto-approve toggle, Download-all ZIP (approved by default, `?include=pending` opt-in).
 
 ## 7. Paystack integration
 
@@ -69,7 +71,7 @@ Tiny guest bundle, fast on low-end Android/3G · compression on by default · **
 
 ## 9. Security & privacy
 
-Private by unguessable slug (+ optional PIN); no listing. **Guest uploads go directly to Supabase Storage over the TUS endpoint** using the public anon key (`authorization` + `apikey` headers) plus `x-upsert` (so a resumed upload can PATCH an existing chunk without 409-ing). A **Storage RLS policy (`supabase/migrations/0003_storage_rls.sql`) gates those writes to `events/{event_id}/…` under an active, unexpired event** — the abuse surface is bounded by Storage RLS + Supabase, not an app endpoint (this is why the old `/api/uploads/sign` route was removed). Once the object lands, the guest calls `POST /api/uploads/register` (**rate-limited** by IP + uploader token; **idempotent** by `(event_id, content_hash)`) to insert the `media` row; guests never query the DB directly. Media reads via short-lived signed URLs; bulk download host-only. RLS on every table. Honor `storage_expires_at` via scheduled cleanup. Host can delete any item.
+Private by unguessable slug (+ optional PIN); no listing. **Guest uploads go directly to Supabase Storage over the TUS endpoint** using the public anon key (`authorization` + `apikey` headers) plus `x-upsert` (so a resumed upload can PATCH an existing chunk without 409-ing). A **Storage RLS policy (`supabase/migrations/0003_storage_rls.sql`) gates those writes to `events/{event_id}/…` under an active, unexpired event** — the abuse surface is bounded by Storage RLS + Supabase, not an app endpoint (this is why the old `/api/uploads/sign` route was removed). Once the object lands, the guest calls `POST /api/uploads/register` (**rate-limited** by IP + uploader token; **idempotent** by `(event_id, content_hash)`) to insert the `media` row **as `pending`** (§4); guests never query the DB directly. Media reads via short-lived signed URLs, **and any guest-facing read path may only sign `approved` media or media matching the requester's own `uploader_token`** — public counts and the default ZIP are approved-only. Known gap: the anon SELECT window in `0003_storage_rls.sql` (needed for TUS resume) still exposes raw objects of an open event regardless of approval status — must be closed before the guest gallery ships (FRI-44, blocks FRI-37). Bulk download host-only. RLS on every table. Honor `storage_expires_at` via scheduled cleanup. Host can approve, hide, or delete any item.
 
 ## 10. Edge cases
 

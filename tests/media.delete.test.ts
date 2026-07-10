@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// FRI-17 acceptance tests for host moderation / delete.
+// FRI-17 acceptance tests for host moderation / delete, revised by FRI-30.
 //   - Auth: unauthenticated → 401; foreign event id → 404 (RLS-shaped).
 //   - Body validation: non-array / empty / over-cap payloads → 4xx.
-//   - Single + multi-select delete flips status='active' → 'deleted'; the
+//   - Single + multi-select delete flips status → 'rejected' (FRI-30 renamed
+//     the old 'deleted'); works from both 'approved' and 'pending'; the
 //     response lists the exact ids that changed this request.
 //   - Cross-event scoping: an id belonging to another event the host owns
 //     is NOT touched — the endpoint scopes updates by (event_id + ids).
@@ -12,11 +13,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 //     rows whose event isn't in the caller's `ownedEventIds` set.
 //   - Downstream: after deletion, the same in-memory model (via
 //     loadGalleryPage / fetchTotalCount) omits the row from the gallery
-//     grid and total count — which is what any future ZIP export must
-//     reuse.
+//     grid and total count — which is what the ZIP export reuses.
 //
 // The mock mirrors tests/gallery.test.ts (media stored in-memory, RLS
 // modelled by the events-ownership set + the media row's event pointer).
+
+type MediaStatus = "pending" | "approved" | "rejected";
 
 type MediaRow = {
   id: string;
@@ -28,7 +30,7 @@ type MediaRow = {
   height: number | null;
   bytes: number | null;
   created_at: string;
-  status: "active" | "deleted";
+  status: MediaStatus;
 };
 
 const state: {
@@ -42,7 +44,7 @@ const state: {
   media: MediaRow[];
   lastMediaUpdate: {
     eventId?: string;
-    statusFilter?: string;
+    statusIn?: string[];
     ids?: string[];
     newStatus?: string;
   };
@@ -80,12 +82,13 @@ function eventsSelectChain(_cols: string) {
   return api;
 }
 
-// media.select(…).eq(…).range(…) — used by the gallery grid queries after
-// deletion so we can assert the same in-memory rows are hidden.
+// media.select(…).eq(…)/.in(…).range(…) — used by the gallery grid queries
+// after deletion so we can assert the same in-memory rows are hidden.
 function mediaSelectChain(_cols: string, options?: { count?: string; head?: boolean }) {
   const filters: {
     eventId?: string;
-    status?: string;
+    statusEq?: string;
+    statusIn?: string[];
     uploaderEq?: string;
     uploaderIsNull?: boolean;
   } = {};
@@ -94,7 +97,8 @@ function mediaSelectChain(_cols: string, options?: { count?: string; head?: bool
   const applyFilters = () => {
     return state.media.filter((r) => {
       if (filters.eventId && r.event_id !== filters.eventId) return false;
-      if (filters.status && r.status !== filters.status) return false;
+      if (filters.statusEq && r.status !== filters.statusEq) return false;
+      if (filters.statusIn && !filters.statusIn.includes(r.status)) return false;
       if (filters.uploaderEq !== undefined && r.uploader_token !== filters.uploaderEq)
         return false;
       if (filters.uploaderIsNull && r.uploader_token !== null) return false;
@@ -105,8 +109,12 @@ function mediaSelectChain(_cols: string, options?: { count?: string; head?: bool
   const api: Record<string, unknown> = {
     eq(col: string, val: string) {
       if (col === "event_id") filters.eventId = val;
-      if (col === "status") filters.status = val;
+      if (col === "status") filters.statusEq = val;
       if (col === "uploader_token") filters.uploaderEq = val;
+      return api;
+    },
+    in(col: string, vals: string[]) {
+      if (col === "status") filters.statusIn = vals;
       return api;
     },
     is(col: string, val: unknown) {
@@ -136,29 +144,29 @@ function mediaSelectChain(_cols: string, options?: { count?: string; head?: bool
   return api;
 }
 
-// media.update({ status:'deleted' }).eq('event_id',…).eq('status','active').in('id',[…]).select('id')
+// media.update({ status:'rejected' }).eq('event_id',…).in('status',[…]).in('id',[…]).select('id')
 function mediaUpdateChain(patch: Record<string, unknown>) {
   const filters: {
     eventId?: string;
-    statusFilter?: string;
+    statusIn?: string[];
     ids?: string[];
   } = {};
 
   const api = {
     eq(col: string, val: string) {
       if (col === "event_id") filters.eventId = val;
-      if (col === "status") filters.statusFilter = val;
       return api;
     },
     in(col: string, values: string[]) {
       if (col === "id") filters.ids = values;
+      if (col === "status") filters.statusIn = values;
       return api;
     },
     select(_cols: string) {
       // Capture what the endpoint queried, so tests can assert on shape.
       state.lastMediaUpdate = {
         eventId: filters.eventId,
-        statusFilter: filters.statusFilter,
+        statusIn: filters.statusIn,
         ids: filters.ids,
         newStatus: patch.status as string,
       };
@@ -169,7 +177,7 @@ function mediaUpdateChain(patch: Record<string, unknown>) {
       for (const row of state.media) {
         if (!filters.ids?.includes(row.id)) continue;
         if (filters.eventId && row.event_id !== filters.eventId) continue;
-        if (filters.statusFilter && row.status !== filters.statusFilter) continue;
+        if (filters.statusIn && !filters.statusIn.includes(row.status)) continue;
         // RLS-shaped: caller only sees rows under events they own.
         if (!state.ownedEventIds.has(row.event_id)) continue;
         row.status = (patch.status as MediaRow["status"]) ?? row.status;
@@ -247,7 +255,7 @@ function req(url: string, body: unknown): Request {
   });
 }
 
-function seedMedia(eventId: string, count: number) {
+function seedMedia(eventId: string, count: number, status: MediaStatus = "approved") {
   for (let i = 0; i < count; i += 1) {
     state.media.push({
       id: `m-${eventId}-${i}`,
@@ -259,7 +267,7 @@ function seedMedia(eventId: string, count: number) {
       height: 1536,
       bytes: 250_000,
       created_at: new Date(2026, 5, 1, 0, 0, i).toISOString(),
-      status: "active",
+      status,
     });
   }
 }
@@ -327,7 +335,7 @@ describe("POST /api/events/[id]/media/delete", () => {
     expect(res.status).toBe(413);
   });
 
-  it("soft-deletes a single item and returns the deleted id", async () => {
+  it("soft-deletes a single item to status='rejected' and returns the deleted id", async () => {
     state.user = { id: "host-1" };
     state.ownedEventIds.add("evt-1");
     state.eventOwners.set("evt-1", "host-1");
@@ -344,11 +352,11 @@ describe("POST /api/events/[id]/media/delete", () => {
     expect(body.deleted).toEqual(["m-evt-1-1"]);
 
     const row = state.media.find((r) => r.id === "m-evt-1-1")!;
-    expect(row.status).toBe("deleted");
-    // Sanity: the update was scoped to THIS event + active rows.
+    expect(row.status).toBe("rejected");
+    // Sanity: the update was scoped to THIS event + host-visible rows.
     expect(state.lastMediaUpdate.eventId).toBe("evt-1");
-    expect(state.lastMediaUpdate.statusFilter).toBe("active");
-    expect(state.lastMediaUpdate.newStatus).toBe("deleted");
+    expect(state.lastMediaUpdate.statusIn).toEqual(["pending", "approved"]);
+    expect(state.lastMediaUpdate.newStatus).toBe("rejected");
   });
 
   it("soft-deletes multiple items in one request", async () => {
@@ -370,11 +378,48 @@ describe("POST /api/events/[id]/media/delete", () => {
     );
 
     for (const id of ["m-evt-1-0", "m-evt-1-2", "m-evt-1-4"]) {
-      expect(state.media.find((r) => r.id === id)!.status).toBe("deleted");
+      expect(state.media.find((r) => r.id === id)!.status).toBe("rejected");
     }
     for (const id of ["m-evt-1-1", "m-evt-1-3"]) {
-      expect(state.media.find((r) => r.id === id)!.status).toBe("active");
+      expect(state.media.find((r) => r.id === id)!.status).toBe("approved");
     }
+  });
+
+  it("rejects a pending item too — deleting from the moderation queue works", async () => {
+    state.user = { id: "host-1" };
+    state.ownedEventIds.add("evt-1");
+    state.eventOwners.set("evt-1", "host-1");
+    seedMedia("evt-1", 2, "pending");
+
+    const res = await deletePOST(
+      req("http://localhost/api/events/evt-1/media/delete", {
+        ids: ["m-evt-1-0"],
+      }),
+      { params: { id: "evt-1" } },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { deleted: string[] };
+    expect(body.deleted).toEqual(["m-evt-1-0"]);
+    expect(state.media.find((r) => r.id === "m-evt-1-0")!.status).toBe("rejected");
+    expect(state.media.find((r) => r.id === "m-evt-1-1")!.status).toBe("pending");
+  });
+
+  it("does not re-touch an already-rejected row", async () => {
+    state.user = { id: "host-1" };
+    state.ownedEventIds.add("evt-1");
+    state.eventOwners.set("evt-1", "host-1");
+    seedMedia("evt-1", 1, "rejected");
+
+    const res = await deletePOST(
+      req("http://localhost/api/events/evt-1/media/delete", {
+        ids: ["m-evt-1-0"],
+      }),
+      { params: { id: "evt-1" } },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { deleted: string[] };
+    // Already rejected → not part of what changed THIS request.
+    expect(body.deleted).toEqual([]);
   });
 
   it("ignores an id that belongs to another event the host owns", async () => {
@@ -397,7 +442,7 @@ describe("POST /api/events/[id]/media/delete", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { deleted: string[] };
     expect(body.deleted).toEqual(["m-evt-1-0"]);
-    expect(state.media.find((r) => r.id === "m-evt-2-0")!.status).toBe("active");
+    expect(state.media.find((r) => r.id === "m-evt-2-0")!.status).toBe("approved");
   });
 
   it("denies a cross-host delete: caller cannot touch another host's media", async () => {
@@ -432,7 +477,7 @@ describe("POST /api/events/[id]/media/delete", () => {
     expect(body.deleted).toEqual([]);
     // Cross-check: the target rows are untouched.
     for (const id of ["m-evt-2-0", "m-evt-2-1"]) {
-      expect(state.media.find((r) => r.id === id)!.status).toBe("active");
+      expect(state.media.find((r) => r.id === id)!.status).toBe("approved");
     }
   });
 
@@ -454,7 +499,7 @@ describe("POST /api/events/[id]/media/delete", () => {
     expect(state.lastMediaUpdate.ids).toEqual(["m-evt-1-0"]);
   });
 
-  it("excludes deleted media from the gallery page and total count", async () => {
+  it("excludes rejected media from the gallery page and total count", async () => {
     state.user = { id: "host-1" };
     state.ownedEventIds.add("evt-1");
     state.eventOwners.set("evt-1", "host-1");

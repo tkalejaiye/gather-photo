@@ -10,17 +10,24 @@ import {
 } from "react";
 import type { GalleryItem, GalleryPage, UploaderSummary } from "@/lib/gallery/queries";
 
-// FRI-16 + FRI-17: host gallery grid with soft-delete moderation.
+// FRI-16 + FRI-17 + FRI-30: host gallery grid with moderation.
 // - Uploader filter (Everyone + one pill per uploader token, including anon)
 // - Responsive thumbnail grid served by short-lived signed URLs (server-side)
 // - Lazy-loaded next pages via IntersectionObserver
 // - Tap a thumbnail for full-size lightbox
-// - Select mode: multi-select + delete N; single-item delete inside the lightbox
+// - Select mode: multi-select + approve N / delete N; single-item actions
+//   inside the lightbox
 //
 // FRI-36 restyled this in Daylight ("Recent uploads" pane of D4 / the mobile
 // Moderate grid): tiles are polaroid prints with uploader-name chins, the
-// lightbox is the D3 dark-scrim treatment. Behavior is unchanged; the ZIP
-// download moved up to the page's share/stats column (PRD §7 prominence).
+// lightbox is the D3 dark-scrim treatment.
+//
+// FRI-30 approval states, using the mock's reserved tap-to-hide treatment
+// (design/daylight/README.md screen 13): a *pending* (not-yet-approved) tile
+// keeps the polaroid print but its photo sits under the translucent paper
+// "HIDDEN" overlay. Approve one-tap from the tile chip, from the lightbox
+// (which also un-hides/hides), or in bulk via select mode. Delete (FRI-17,
+// now status='rejected' server-side) works on any tile exactly as before.
 //
 // Kept as a lean client component: no state manager, no image lib. The initial
 // page is server-rendered so first paint shows photos immediately; subsequent
@@ -29,19 +36,28 @@ import type { GalleryItem, GalleryPage, UploaderSummary } from "@/lib/gallery/qu
 type Props = {
   eventId: string;
   totalCount: number;
+  pendingCount: number;
   uploaders: UploaderSummary[];
   initialPage: GalleryPage;
 };
 
 type FilterValue = "all" | { token: string | null };
+// "pending" narrows the grid to the moderation queue (the HIDDEN tiles).
+type StatusFilter = "all" | "pending";
 
-function buildQuery(offset: number, limit: number, f: FilterValue): string {
+function buildQuery(
+  offset: number,
+  limit: number,
+  f: FilterValue,
+  status: StatusFilter,
+): string {
   const qs = new URLSearchParams({ offset: String(offset), limit: String(limit) });
   if (f !== "all") {
     // Empty string means anonymous — the API interprets `has("uploader") &&
     // value === ""` as "filter to NULL uploader_token" (see the route file).
     qs.set("uploader", f.token ?? "");
   }
+  if (status !== "all") qs.set("status", status);
   return qs.toString();
 }
 
@@ -50,8 +66,15 @@ function labelFor(uploader: UploaderSummary): string {
   return uploader.displayName ?? "Guest";
 }
 
-export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Props) {
+export function GalleryGrid({
+  eventId,
+  totalCount,
+  pendingCount,
+  uploaders,
+  initialPage,
+}: Props) {
   const [filter, setFilter] = useState<FilterValue>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [items, setItems] = useState<GalleryItem[]>(initialPage.items);
   const [nextOffset, setNextOffset] = useState<number | null>(initialPage.nextOffset);
   const [hasMore, setHasMore] = useState<boolean>(initialPage.hasMore);
@@ -65,12 +88,15 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [approving, setApproving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   // The uploader-summary counts are server-rendered once; after a delete we
   // decrement the affected uploader locally so the pills stay in sync without
-  // a round-trip.
+  // a round-trip. Approve/hide moves BETWEEN host-visible statuses, so it
+  // touches pendingTotal but never the uploader pills or visibleTotal.
   const [uploaderSummary, setUploaderSummary] = useState<UploaderSummary[]>(uploaders);
   const [visibleTotal, setVisibleTotal] = useState<number>(totalCount);
+  const [pendingTotal, setPendingTotal] = useState<number>(pendingCount);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   // Guard against concurrent fetches when the sentinel becomes visible while a
@@ -89,7 +115,12 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
   }, [filter, visibleTotal, uploaderSummary]);
 
   const fetchPage = useCallback(
-    async (offset: number, activeFilter: FilterValue, mode: "replace" | "append") => {
+    async (
+      offset: number,
+      activeFilter: FilterValue,
+      activeStatus: StatusFilter,
+      mode: "replace" | "append",
+    ) => {
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -97,7 +128,7 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       setError(null);
       try {
         const res = await fetch(
-          `/api/events/${eventId}/media?${buildQuery(offset, 60, activeFilter)}`,
+          `/api/events/${eventId}/media?${buildQuery(offset, 60, activeFilter, activeStatus)}`,
           { signal: ctrl.signal, cache: "no-store" },
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -120,9 +151,10 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
 
   // Filter change → reset the list and refetch from offset 0. Skip only the
   // very first render; the initial page was already rendered server-side for
-  // filter="all". Comparing against a static "initial filter value" is wrong
-  // because clicking "Everyone" after selecting a guest would then be treated
-  // as a no-op and leave the grid stuck on the previous filter's results.
+  // the unfiltered view. Comparing against a static "initial filter value" is
+  // wrong because clicking "Everyone" after selecting a guest would then be
+  // treated as a no-op and leave the grid stuck on the previous filter's
+  // results.
   const didMountRef = useRef(false);
   useEffect(() => {
     if (!didMountRef.current) {
@@ -132,8 +164,8 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
     setItems([]);
     setNextOffset(0);
     setHasMore(true);
-    fetchPage(0, filter, "replace");
-  }, [filter, fetchPage]);
+    fetchPage(0, filter, statusFilter, "replace");
+  }, [filter, statusFilter, fetchPage]);
 
   // Load-more sentinel — when it scrolls into view, fetch the next offset.
   // rootMargin lets us start fetching before the sentinel is fully visible so
@@ -145,14 +177,14 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting) && !loading) {
-          fetchPage(nextOffset, filter, "append");
+          fetchPage(nextOffset, filter, statusFilter, "append");
         }
       },
       { rootMargin: "400px" },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [hasMore, nextOffset, loading, filter, fetchPage]);
+  }, [hasMore, nextOffset, loading, filter, statusFilter, fetchPage]);
 
   // Lightbox keyboard navigation. Only bound while a photo is open.
   useEffect(() => {
@@ -181,9 +213,11 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       if (deletedIds.length === 0 || affected.length === 0) return;
       const removed = new Set(deletedIds);
       const perToken = new Map<string, number>();
+      let pendingHit = 0;
       for (const it of affected) {
         const key = it.uploaderToken ?? "";
         perToken.set(key, (perToken.get(key) ?? 0) + 1);
+        if (it.status === "pending") pendingHit += 1;
       }
       setItems((prev) => prev.filter((i) => !removed.has(i.id)));
       setUploaderSummary((prev) => {
@@ -210,6 +244,7 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
         return next;
       });
       setVisibleTotal((t) => Math.max(0, t - affected.length));
+      if (pendingHit > 0) setPendingTotal((t) => Math.max(0, t - pendingHit));
       setSelected((prev) => {
         if (prev.size === 0) return prev;
         const next = new Set(prev);
@@ -218,6 +253,37 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       });
     },
     [filter],
+  );
+
+  // Apply an approve (pending → approved) or hide (approved → pending) to
+  // the local view. Same unit-update rationale as applyDeletion. Items only
+  // LEAVE the visible list when the "Hidden" status filter is active and
+  // they just stopped being hidden.
+  const applyStatusChange = useCallback(
+    (updatedIds: string[], to: "approved" | "pending") => {
+      if (updatedIds.length === 0) return;
+      const updated = new Set(updatedIds);
+      const leavesView = statusFilter === "pending" && to === "approved";
+      setItems((prev) =>
+        leavesView
+          ? prev.filter((i) => !updated.has(i.id))
+          : prev.map((i) => (updated.has(i.id) ? { ...i, status: to } : i)),
+      );
+      setPendingTotal((t) =>
+        to === "approved"
+          ? Math.max(0, t - updatedIds.length)
+          : t + updatedIds.length,
+      );
+      if (leavesView) {
+        setSelected((prev) => {
+          if (prev.size === 0) return prev;
+          const next = new Set(prev);
+          for (const id of updatedIds) next.delete(id);
+          return next;
+        });
+      }
+    },
+    [statusFilter],
   );
 
   const runDelete = useCallback(
@@ -230,7 +296,7 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       const idSet = new Set(ids);
       const affected = items.filter((i) => idSet.has(i.id));
       setDeleting(true);
-      setDeleteError(null);
+      setActionError(null);
       try {
         const res = await fetch(`/api/events/${eventId}/media/delete`, {
           method: "POST",
@@ -244,7 +310,7 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
         applyDeletion(deleted, affected.filter((i) => deletedSet.has(i.id)));
         return deleted;
       } catch {
-        setDeleteError(
+        setActionError(
           ids.length === 1
             ? "Couldn't delete this photo. Try again."
             : `Couldn't delete ${ids.length} photos. Try again.`,
@@ -257,12 +323,48 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
     [eventId, items, applyDeletion],
   );
 
+  // approved=true publishes pending shots; approved=false hides an approved
+  // one again. The server only flips rows in the opposite state and echoes
+  // the ids that changed, so the local update reconciles against `updated`
+  // rather than the request payload.
+  const runApprove = useCallback(
+    async (ids: string[], approved: boolean) => {
+      if (ids.length === 0) return null;
+      setApproving(true);
+      setActionError(null);
+      try {
+        const res = await fetch(`/api/events/${eventId}/media/approve`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ids, approved }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = (await res.json()) as { updated: string[] };
+        const updated = body.updated ?? [];
+        applyStatusChange(updated, approved ? "approved" : "pending");
+        return updated;
+      } catch {
+        setActionError(
+          approved
+            ? ids.length === 1
+              ? "Couldn't approve this photo. Try again."
+              : `Couldn't approve ${ids.length} photos. Try again.`
+            : "Couldn't hide this photo. Try again.",
+        );
+        return null;
+      } finally {
+        setApproving(false);
+      }
+    },
+    [eventId, applyStatusChange],
+  );
+
   const toggleSelectMode = useCallback(() => {
     setSelectMode((v) => {
       if (v) setSelected(new Set());
       return !v;
     });
-    setDeleteError(null);
+    setActionError(null);
   }, []);
 
   const toggleItemSelected = useCallback((id: string) => {
@@ -285,6 +387,17 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
     [selectMode, toggleItemSelected],
   );
 
+  // Bulk approve only acts on the pending rows in the selection — the count
+  // on the button says how many will actually publish.
+  const selectedPendingCount = useMemo(() => {
+    if (selected.size === 0) return 0;
+    let n = 0;
+    for (const item of items) {
+      if (item.status === "pending" && selected.has(item.id)) n += 1;
+    }
+    return n;
+  }, [items, selected]);
+
   const onDeleteSelected = useCallback(async () => {
     if (selected.size === 0) return;
     const count = selected.size;
@@ -298,6 +411,15 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
       setSelected(new Set());
     }
   }, [selected, runDelete]);
+
+  const onApproveSelected = useCallback(async () => {
+    if (selected.size === 0) return;
+    const updated = await runApprove(Array.from(selected), true);
+    if (updated && updated.length > 0) {
+      setSelectMode(false);
+      setSelected(new Set());
+    }
+  }, [selected, runApprove]);
 
   const onDeleteFromLightbox = useCallback(
     async (item: GalleryItem, atIndex: number) => {
@@ -319,6 +441,38 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
     [runDelete, items.length],
   );
 
+  const onToggleApproveFromLightbox = useCallback(
+    async (item: GalleryItem, atIndex: number) => {
+      const publish = item.status === "pending";
+      const updated = await runApprove([item.id], publish);
+      // Approving under the "Hidden" filter removes the item from the list
+      // (it stopped being hidden) — same index math as the delete path.
+      if (
+        updated &&
+        updated.length === 1 &&
+        statusFilter === "pending" &&
+        publish
+      ) {
+        setLightboxIndex((current) => {
+          if (current === null) return null;
+          const nextLen = items.length - updated.length;
+          if (nextLen <= 0) return null;
+          return Math.min(atIndex, nextLen - 1);
+        });
+      }
+    },
+    [runApprove, statusFilter, items.length],
+  );
+
+  const countLine =
+    statusFilter === "pending"
+      ? `${pendingTotal} hidden ${pendingTotal === 1 ? "shot" : "shots"} awaiting approval`
+      : filter !== "all"
+        ? `${filterTotal} of ${visibleTotal}`
+        : pendingTotal > 0
+          ? `${visibleTotal} ${visibleTotal === 1 ? "shot" : "shots"} · ${pendingTotal} hidden`
+          : `${visibleTotal} ${visibleTotal === 1 ? "shot" : "shots"} in the roll`;
+
   return (
     <section>
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -326,11 +480,7 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
           <h2 className="font-display text-[15px] uppercase tracking-[0.02em] text-daylight-ink">
             Recent uploads
           </h2>
-          <p className="mt-1 font-mono text-xs text-daylight-muted">
-            {filter === "all"
-              ? `${visibleTotal} ${visibleTotal === 1 ? "shot" : "shots"} in the roll`
-              : `${filterTotal} of ${visibleTotal}`}
-          </p>
+          <p className="mt-1 font-mono text-xs text-daylight-muted">{countLine}</p>
         </div>
         {visibleTotal > 0 && (
           <button
@@ -349,11 +499,35 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
         )}
       </div>
 
+      {/* Moderation-queue filter (FRI-30). Only rendered once there is (or
+          was, this session) something hidden to review — an auto-approve
+          event never shows it. */}
+      {(pendingTotal > 0 || statusFilter === "pending") && (
+        <div
+          role="tablist"
+          aria-label="Filter photos by review status"
+          className="mt-4 flex flex-wrap gap-2"
+        >
+          <FilterPill
+            active={statusFilter === "all"}
+            onClick={() => setStatusFilter("all")}
+            label="All"
+            count={visibleTotal}
+          />
+          <FilterPill
+            active={statusFilter === "pending"}
+            onClick={() => setStatusFilter("pending")}
+            label="Hidden"
+            count={pendingTotal}
+          />
+        </div>
+      )}
+
       {uploaderSummary.length > 0 && (
         <div
           role="tablist"
           aria-label="Filter photos by uploader"
-          className="mt-4 flex flex-wrap gap-2"
+          className="mt-3 flex flex-wrap gap-2"
         >
           <FilterPill
             active={filter === "all"}
@@ -383,17 +557,20 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
         <div className="mt-5 rounded-daylight-card border border-daylight-rule bg-white/50 p-6 text-center">
           <p className="text-2xl">🎬</p>
           <p className="mt-2 text-sm text-daylight-ink-soft">
-            {filter === "all"
-              ? "No photos yet. Share the guest link to start collecting."
-              : "No photos from this uploader."}
+            {statusFilter === "pending"
+              ? "Nothing hidden — every shot has been reviewed."
+              : filter === "all"
+                ? "No photos yet. Share the guest link to start collecting."
+                : "No photos from this uploader."}
           </p>
         </div>
       ) : (
         <ul className="mt-4 grid grid-cols-3 gap-2 md:grid-cols-4 lg:gap-3">
           {items.map((item, index) => {
             const isSelected = selected.has(item.id);
+            const isPending = item.status === "pending";
             return (
-              <li key={item.id}>
+              <li key={item.id} className="relative">
                 {/* Polaroid print: white frame, photo, uploader-name chin. */}
                 <button
                   type="button"
@@ -410,12 +587,13 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
                       ? isSelected
                         ? "Deselect photo"
                         : "Select photo"
-                      : item.uploaderName
-                        ? `Photo by ${item.uploaderName}`
-                        : "Photo by a guest"
+                      : (item.uploaderName
+                          ? `Photo by ${item.uploaderName}`
+                          : "Photo by a guest") +
+                        (isPending ? " (hidden until you approve it)" : "")
                   }
                 >
-                  <span className="block aspect-square overflow-hidden rounded-[2px] bg-daylight-paper-edge">
+                  <span className="relative block aspect-square overflow-hidden rounded-[2px] bg-daylight-paper-edge">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={item.url}
@@ -427,6 +605,19 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
                         (selectMode && isSelected ? " opacity-70" : "")
                       }
                     />
+                    {/* FRI-30: the mock's "Hidden" overlay (screen 13) marks
+                        a shot guests can't see yet. */}
+                    {isPending && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-0 flex items-center justify-center bg-[rgba(244,233,206,0.82)] backdrop-blur-[2px]"
+                      >
+                        {/* "Hidden" verbatim per the mock (screen 13). */}
+                        <span className="font-mono text-[11px] font-bold tracking-[0.08em] text-daylight-ink">
+                          Hidden
+                        </span>
+                      </span>
+                    )}
                   </span>
                   <span className="mt-1 block truncate px-0.5 font-mono text-[10px] font-bold text-daylight-muted">
                     {item.uploaderName ?? "Anonymous"}
@@ -445,6 +636,24 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
                     </span>
                   )}
                 </button>
+                {/* One-tap approve, kept OUTSIDE the tile button (nested
+                    buttons are invalid HTML). Hidden in select mode where
+                    the whole tile is a checkbox. */}
+                {isPending && !selectMode && (
+                  <button
+                    type="button"
+                    onClick={() => runApprove([item.id], true)}
+                    disabled={approving}
+                    aria-label={
+                      item.uploaderName
+                        ? `Approve photo by ${item.uploaderName}`
+                        : "Approve photo"
+                    }
+                    className="absolute left-2 top-2 rounded-daylight-chip bg-daylight-orange-grad px-2 py-1 font-mono text-[9px] font-bold tracking-[0.06em] text-white shadow transition active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    ✓ APPROVE
+                  </button>
+                )}
               </li>
             );
           })}
@@ -456,7 +665,9 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
           <span className="flex-1">{error}</span>
           <button
             type="button"
-            onClick={() => nextOffset !== null && fetchPage(nextOffset, filter, "append")}
+            onClick={() =>
+              nextOffset !== null && fetchPage(nextOffset, filter, statusFilter, "append")
+            }
             className="rounded-daylight-chip border border-daylight-red/50 px-3 py-1 font-mono text-xs font-bold text-daylight-red-deep transition hover:bg-daylight-red/10"
           >
             Retry
@@ -464,12 +675,12 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
         </div>
       )}
 
-      {deleteError && (
+      {actionError && (
         <div
           role="alert"
           className="mt-5 rounded-daylight-field border border-daylight-red/50 bg-daylight-red/10 px-4 py-3 text-sm text-daylight-red-deep"
         >
-          {deleteError}
+          {actionError}
         </div>
       )}
 
@@ -495,10 +706,20 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
                 ? "Tap photos to select"
                 : `${selected.size} selected`}
             </span>
+            {selectedPendingCount > 0 && (
+              <button
+                type="button"
+                onClick={onApproveSelected}
+                disabled={approving || deleting}
+                className="rounded-[9px] bg-daylight-orange-grad px-3 py-1.5 font-mono text-xs font-bold text-white shadow transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {approving ? "Approving…" : `Approve ${selectedPendingCount}`}
+              </button>
+            )}
             <button
               type="button"
               onClick={onDeleteSelected}
-              disabled={selected.size === 0 || deleting}
+              disabled={selected.size === 0 || deleting || approving}
               className="rounded-[9px] bg-daylight-red px-3 py-1.5 font-mono text-xs font-bold text-white shadow transition hover:brightness-105 disabled:cursor-not-allowed disabled:bg-daylight-ink/10 disabled:text-daylight-muted"
             >
               {deleting ? "Deleting…" : `Delete${selected.size ? ` ${selected.size}` : ""}`}
@@ -529,7 +750,10 @@ export function GalleryGrid({ eventId, totalCount, uploaders, initialPage }: Pro
               : null
           }
           onDelete={() => onDeleteFromLightbox(activeItem, lightboxIndex)}
-          deleting={deleting}
+          onToggleApprove={() =>
+            onToggleApproveFromLightbox(activeItem, lightboxIndex)
+          }
+          busy={deleting || approving}
         />
       )}
     </section>
@@ -574,19 +798,23 @@ function Lightbox({
   onPrev,
   onNext,
   onDelete,
-  deleting,
+  onToggleApprove,
+  busy,
 }: {
   item: GalleryItem;
   onClose: () => void;
   onPrev: (() => void) | null;
   onNext: (() => void) | null;
   onDelete: () => void;
-  deleting: boolean;
+  onToggleApprove: () => void;
+  busy: boolean;
 }) {
   // Close on backdrop click but not on clicks inside the image container.
   function onBackdropKey(ev: ReactKeyboardEvent<HTMLDivElement>) {
     if (ev.key === "Enter" || ev.key === " ") onClose();
   }
+
+  const isPending = item.status === "pending";
 
   // D3 lightbox treatment: dark ink scrim over the paper, the photo as a
   // large white print, paper-toned metadata.
@@ -616,17 +844,38 @@ function Lightbox({
           <span className="font-bold text-daylight-paper">
             {item.uploaderName ?? "Anonymous"}
           </span>
+          {isPending && (
+            <span className="rounded-daylight-chip border border-daylight-paper/30 px-2 py-0.5 text-[10px] font-bold tracking-[0.08em] text-daylight-paper/80">
+              Hidden
+            </span>
+          )}
           <span>·</span>
           <time dateTime={item.createdAt}>
             {new Date(item.createdAt).toLocaleString()}
           </time>
+          {/* FRI-30: publish / un-publish. Approve moves a hidden shot into
+              the public roll; Hide pulls an approved one back out without
+              rejecting it. */}
+          <button
+            type="button"
+            onClick={onToggleApprove}
+            disabled={busy}
+            className={
+              "rounded-daylight-chip px-3 py-1 font-bold transition disabled:cursor-not-allowed disabled:opacity-60 " +
+              (isPending
+                ? "bg-daylight-orange-grad text-white shadow hover:brightness-105"
+                : "border border-daylight-paper/30 text-daylight-paper hover:border-daylight-paper/60")
+            }
+          >
+            {busy ? "Saving…" : isPending ? "Approve" : "Hide"}
+          </button>
           <button
             type="button"
             onClick={onDelete}
-            disabled={deleting}
+            disabled={busy}
             className="rounded-daylight-chip border border-red-400/40 bg-red-500/15 px-3 py-1 font-bold text-red-200 transition hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {deleting ? "Deleting…" : "Delete"}
+            {busy ? "…" : "Delete"}
           </button>
         </div>
         <div className="absolute inset-y-0 left-0 flex items-center">

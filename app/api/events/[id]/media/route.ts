@@ -5,11 +5,13 @@ import {
   MAX_PAGE_SIZE,
   loadGalleryPage,
   ownsEvent,
+  type MediaStatus,
 } from "@/lib/gallery/queries";
 
-// GET /api/events/[id]/media?offset=…&limit=…&uploader=…
-// Host-only, RLS-scoped. Returns one paginated page of the event's active
-// media with short-lived signed URLs. FRI-16 / TECH_SPEC §6 §9.
+// GET /api/events/[id]/media?offset=…&limit=…&uploader=…&status=…
+// Host-only, RLS-scoped. Returns one paginated page of the event's
+// host-visible (pending + approved) media with short-lived signed URLs.
+// FRI-16 / FRI-30 / TECH_SPEC §6 §9.
 //
 // The signed URLs expire in SIGNED_URL_TTL_SECONDS (300s) — a host who leaves
 // the tab open past that will see broken thumbs on refresh, which is the
@@ -62,11 +64,25 @@ export async function GET(
     uploaderToken = undefined;
   }
 
+  // Status filter (FRI-30 moderation queue): `?status=pending` narrows to
+  // the un-reviewed queue, `?status=approved` to the public roll. Omitted →
+  // both. Anything else (including 'rejected' — soft-deleted rows must stay
+  // unreachable) is a 400 rather than a silent full-page fallback.
+  let status: MediaStatus | undefined;
+  const rawStatus = url.searchParams.get("status");
+  if (rawStatus !== null) {
+    if (rawStatus !== "pending" && rawStatus !== "approved") {
+      return NextResponse.json({ error: "Invalid status." }, { status: 400 });
+    }
+    status = rawStatus;
+  }
+
   try {
     const page = await loadGalleryPage(supabase, params.id, {
       offset,
       limit,
       uploaderToken,
+      status,
     });
     return NextResponse.json(page);
   } catch {

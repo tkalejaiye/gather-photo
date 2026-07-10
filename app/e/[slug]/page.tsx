@@ -96,10 +96,11 @@ export default async function GuestUploadPage({ params, searchParams }: Props) {
     }
   }
 
-  // Landing pill: the event's real shot count, fetched server-side with the
+  // Landing pill: the event's shot count, fetched server-side with the
   // service client — guests never query the DB (TECH_SPEC §9). One COUNT
-  // per page load (head:true), same query the host dashboard uses.
-  const mediaCount = await fetchTotalCount(createServiceClient(), event.id);
+  // per page load (head:true). Approved only (FRI-30): this is a public
+  // surface, and public counts must not reveal the unmoderated queue.
+  const mediaCount = await fetchTotalCount(createServiceClient(), event.id, "approved");
 
   return (
     <ScreenShell contentClassName="mx-auto w-full max-w-[440px]">

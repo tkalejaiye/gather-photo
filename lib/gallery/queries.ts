@@ -22,6 +22,19 @@ export const SIGNED_URL_TTL_SECONDS = 300;
 export const DEFAULT_PAGE_SIZE = 60;
 export const MAX_PAGE_SIZE = 200;
 
+// FRI-30 approval vocabulary. 'rejected' (the FRI-17 soft-delete, renamed)
+// exists in the DB but never leaves it — every query in this module filters
+// to the host-visible pair, so a rejected row is invisible to grid, counts,
+// pills, and ZIP alike.
+//
+// Visibility contract (TECH_SPEC §9):
+//   host          → pending + approved (this module)
+//   public/guest  → approved ONLY (pass status:"approved" — the guest
+//                   landing count does; the FRI-37 guest gallery must too,
+//                   plus its own uploader_token's pending rows)
+export type MediaStatus = "pending" | "approved";
+export const HOST_VISIBLE_STATUSES: MediaStatus[] = ["pending", "approved"];
+
 export type GalleryMediaRow = {
   id: string;
   storage_path: string;
@@ -31,6 +44,7 @@ export type GalleryMediaRow = {
   height: number | null;
   bytes: number | null;
   created_at: string;
+  status: MediaStatus;
 };
 
 export type GalleryItem = {
@@ -43,6 +57,7 @@ export type GalleryItem = {
   height: number | null;
   bytes: number | null;
   createdAt: string;
+  status: MediaStatus;
 };
 
 export type GalleryPage = {
@@ -85,15 +100,19 @@ type FetchMediaOptions = {
   offset?: number;
   limit?: number;
   uploaderToken?: string | null;
+  // Narrow to one host-visible status ('pending' drives the moderation-queue
+  // filter). Omitted → both pending and approved. 'rejected' is deliberately
+  // not accepted: nothing should page through soft-deleted rows.
+  status?: MediaStatus;
 };
 
-// Fetch one page of active media for a host-owned event. RLS on `media`
+// Fetch one page of host-visible media for a host-owned event. RLS on `media`
 // enforces ownership; ownsEvent() should still run first so a foreign
 // event id returns a clean 404 rather than an empty page.
 export async function fetchMediaPage(
   supabase: SupabaseClient,
   eventId: string,
-  { offset = 0, limit = DEFAULT_PAGE_SIZE, uploaderToken }: FetchMediaOptions = {},
+  { offset = 0, limit = DEFAULT_PAGE_SIZE, uploaderToken, status }: FetchMediaOptions = {},
 ): Promise<GalleryMediaRow[]> {
   // MAX_PAGE_SIZE clamping lives in loadGalleryPage (the public entry point).
   // Clamping again here would silently eat the `limit + 1` look-ahead when a
@@ -109,10 +128,14 @@ export async function fetchMediaPage(
   let q = supabase
     .from("media")
     .select(
-      "id, storage_path, uploader_token, uploader_name, width, height, bytes, created_at",
+      "id, storage_path, uploader_token, uploader_name, width, height, bytes, created_at, status",
     )
-    .eq("event_id", eventId)
-    .eq("status", "active");
+    .eq("event_id", eventId);
+
+  // Host default: everything reviewable (pending + approved). A narrowed
+  // status uses .eq so the planner can serve it straight off
+  // media_event_created_idx's (event_id, status, …) prefix.
+  q = status ? q.eq("status", status) : q.in("status", HOST_VISIBLE_STATUSES);
 
   if (uploaderToken !== undefined) {
     if (uploaderToken === null || uploaderToken === "") {
@@ -191,6 +214,7 @@ export async function loadGalleryPage(
       height: r.height,
       bytes: r.bytes,
       createdAt: r.created_at,
+      status: r.status,
     }));
 
   return {
@@ -200,18 +224,24 @@ export async function loadGalleryPage(
   };
 }
 
-// Total active media count for the event. The `head: true` variant does not
-// return rows — just the exact count from the DB — so a 1,000-photo event
-// costs one COUNT rather than a full scan.
+// Media count for the event. The `head: true` variant does not return rows —
+// just the exact count from the DB — so a 1,000-photo event costs one COUNT
+// rather than a full scan.
+//
+// Status selects the audience: omitted → host view (pending + approved);
+// "approved" → the ONLY count any guest-facing surface may show (the landing
+// pill uses it; TECH_SPEC §9); "pending" → the moderation-queue badge.
 export async function fetchTotalCount(
   supabase: SupabaseClient,
   eventId: string,
+  status?: MediaStatus,
 ): Promise<number> {
-  const { count } = await supabase
+  let q = supabase
     .from("media")
     .select("id", { count: "exact", head: true })
-    .eq("event_id", eventId)
-    .eq("status", "active");
+    .eq("event_id", eventId);
+  q = status ? q.eq("status", status) : q.in("status", HOST_VISIBLE_STATUSES);
+  const { count } = await q;
   return count ?? 0;
 }
 

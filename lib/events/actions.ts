@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { ensureProfile } from "@/lib/auth/ensureProfile";
 import { getEventBySlug, getEventPinSecret } from "./lookup";
@@ -83,6 +84,36 @@ export async function createEventFromForm(formData: FormData) {
     redirect(`/dashboard/new?error=${encodeURIComponent(res.error)}`);
   }
   redirect(`/dashboard/events/${res.id}`);
+}
+
+// FRI-30: per-event opt-out of moderation. When ON, new uploads register as
+// 'approved' directly. Flipping it does NOT retro-approve the existing
+// pending queue — those still need explicit host review (safer default: a
+// host toggling mid-event probably means "stop making me approve new stuff",
+// not "publish everything I've been ignoring").
+export async function setAutoApprove(
+  eventId: string,
+  autoApprove: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You must be signed in." };
+
+  // RLS (`own events`) scopes the update to the caller's own events — a
+  // foreign event id matches zero rows. `.select` so we can tell "not
+  // yours/doesn't exist" apart from success.
+  const { data, error } = await supabase
+    .from("events")
+    .update({ auto_approve: autoApprove })
+    .eq("id", eventId)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) return { ok: false, error: "Could not update the event." };
+
+  revalidatePath(`/dashboard/events/${eventId}`);
+  return { ok: true };
 }
 
 const PIN_COOKIE_MAX_AGE = 60 * 60 * 8; // 8h — long enough for an event

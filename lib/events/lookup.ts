@@ -13,6 +13,9 @@ export type EventForGuest = {
   status: string;
   uploads_close_at: string | null;
   storage_expires_at: string | null;
+  // FRI-30: when true, /api/uploads/register inserts media as 'approved'
+  // instead of 'pending' (host opted out of moderating).
+  auto_approve: boolean;
 };
 
 // Service-role lookup: RLS on `events` only allows the owning host to read,
@@ -25,7 +28,7 @@ export async function getEventBySlug(
   const { data, error } = await svc
     .from("events")
     .select(
-      "id, slug, name, event_date, pin, status, uploads_close_at, storage_expires_at",
+      "id, slug, name, event_date, pin, status, uploads_close_at, storage_expires_at, auto_approve",
     )
     .eq("slug", slug)
     .maybeSingle();
@@ -39,6 +42,7 @@ export async function getEventBySlug(
     status: data.status,
     uploads_close_at: data.uploads_close_at,
     storage_expires_at: data.storage_expires_at,
+    auto_approve: !!data.auto_approve,
   };
 }
 

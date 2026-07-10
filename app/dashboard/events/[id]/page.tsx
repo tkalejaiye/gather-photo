@@ -9,6 +9,7 @@ import { Eyebrow } from "@/components/ui/eyebrow";
 import { ScreenShell } from "@/components/ui/screen-shell";
 import { Wordmark } from "@/components/ui/wordmark";
 import { statusLine } from "../../status";
+import { AutoApproveToggle } from "./AutoApproveToggle";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { GalleryGrid } from "./GalleryGrid";
 import {
@@ -45,16 +46,20 @@ export default async function EventDetailPage({
   // RLS scopes this select to the host's own events.
   const { data: event } = await supabase
     .from("events")
-    .select("id, name, slug, pin, event_date, status, uploads_close_at, created_at")
+    .select(
+      "id, name, slug, pin, event_date, status, uploads_close_at, auto_approve, created_at",
+    )
     .eq("id", params.id)
     .maybeSingle();
   if (!event) notFound();
 
-  // Fan the three gallery reads out in parallel — they hit independent
-  // indexes and don't depend on one another.
-  const [initialPage, mediaCount, uploaders] = await Promise.all([
+  // Fan the gallery reads out in parallel — they hit independent indexes
+  // and don't depend on one another. mediaCount is the HOST total
+  // (pending + approved); pendingCount drives the moderation-queue UI.
+  const [initialPage, mediaCount, pendingCount, uploaders] = await Promise.all([
     loadGalleryPage(supabase, event.id, { offset: 0, limit: DEFAULT_PAGE_SIZE }),
     fetchTotalCount(supabase, event.id),
+    fetchTotalCount(supabase, event.id, "pending"),
     fetchUploaderSummary(supabase, event.id),
   ]);
 
@@ -187,19 +192,37 @@ export default async function EventDetailPage({
               <StatCard value={uploaders.length} label="CROWD" />
             </div>
 
+            <AutoApproveToggle
+              eventId={event.id}
+              initialValue={!!event.auto_approve}
+            />
+
             {mediaCount > 0 && (
               /* FRI-18: streamed ZIP export. A plain <a> beats fetch()+Blob
                  because the browser can spool multi-GB responses to disk
-                 as they arrive, whereas Blob buffers the whole payload. */
-              <a
-                href={`/api/events/${event.id}/download`}
-                className={daylightButtonClasses("secondary", "w-full")}
-                aria-label="Download all photos as ZIP"
-              >
-                {/* U+2193, not U+2B07 — the latter defaults to emoji
-                    presentation on iOS (blue square). */}
-                ↓ DOWNLOAD ZIP
-              </a>
+                 as they arrive, whereas Blob buffers the whole payload.
+                 FRI-30: the default ZIP = the public roll (approved only);
+                 the hidden queue is an explicit opt-in below. */
+              <div>
+                <a
+                  href={`/api/events/${event.id}/download`}
+                  className={daylightButtonClasses("secondary", "w-full")}
+                  aria-label="Download approved photos as ZIP"
+                >
+                  {/* U+2193, not U+2B07 — the latter defaults to emoji
+                      presentation on iOS (blue square). */}
+                  ↓ DOWNLOAD ZIP
+                </a>
+                {pendingCount > 0 && (
+                  <a
+                    href={`/api/events/${event.id}/download?include=pending`}
+                    className="mt-2 block text-center font-mono text-[11px] text-daylight-muted underline decoration-daylight-rule underline-offset-2 transition hover:text-daylight-ink"
+                  >
+                    Include {pendingCount} hidden{" "}
+                    {pendingCount === 1 ? "shot" : "shots"} in the ZIP
+                  </a>
+                )}
+              </div>
             )}
           </div>
 
@@ -208,6 +231,7 @@ export default async function EventDetailPage({
             <GalleryGrid
               eventId={event.id}
               totalCount={mediaCount}
+              pendingCount={pendingCount}
               uploaders={uploaders}
               initialPage={initialPage}
             />

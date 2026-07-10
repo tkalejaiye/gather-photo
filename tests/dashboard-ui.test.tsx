@@ -55,6 +55,7 @@ vi.mock("@/lib/gallery/queries", () => ({
         height: 1000,
         bytes: 12345,
         createdAt: "2026-07-05T20:00:00Z",
+        status: "approved",
       },
       {
         id: "m-2",
@@ -66,12 +67,19 @@ vi.mock("@/lib/gallery/queries", () => ({
         height: 1000,
         bytes: 12345,
         createdAt: "2026-07-05T21:00:00Z",
+        status: "pending",
       },
     ],
     hasMore: false,
     nextOffset: null,
   }),
-  fetchTotalCount: vi.fn().mockResolvedValue(132),
+  // FRI-30: the page asks for the host total (no status) AND the pending
+  // count. One awaiting-approval shot matches the m-2 item above.
+  fetchTotalCount: vi
+    .fn()
+    .mockImplementation((_supabase: unknown, _eventId: string, status?: string) =>
+      Promise.resolve(status === "pending" ? 1 : 132),
+    ),
   fetchUploaderSummary: vi.fn().mockResolvedValue([
     { token: "t-priya", displayName: "Priya", count: 100 },
     { token: "", displayName: null, count: 32 },
@@ -201,6 +209,7 @@ describe("/dashboard/events/[id] Roll Control", () => {
     event_date: "2026-07-04",
     status: "active",
     uploads_close_at: "2026-07-08T18:00:00Z",
+    auto_approve: false,
     created_at: "2026-06-01T00:00:00Z",
   };
 
@@ -234,6 +243,28 @@ describe("/dashboard/events/[id] Roll Control", () => {
     expect(html).toContain("Priya");
     expect(html).toContain("Anonymous");
     expect(html).toContain("Recent uploads");
+  });
+
+  it("renders the FRI-30 approval affordances for a pending shot", async () => {
+    fromMock.mockImplementation(() => eventDetailChain(liveEvent));
+    const html = renderToStaticMarkup(
+      await EventDetailPage({ params: { id: "e-1" } }),
+    );
+    // The m-2 stub item is pending → the mock's reserved "Hidden" overlay
+    // treatment plus a one-tap approve chip on the tile.
+    expect(html).toContain(">Hidden</span>");
+    expect(html).toContain("✓ APPROVE");
+    // Moderation-queue filter pills appear once something is pending.
+    expect(html).toContain(">Hidden<");
+    // Count line surfaces the queue size next to the host total.
+    expect(html).toContain("132 shots · 1 hidden");
+    // Auto-approve toggle card in the share/stats column, defaulting OFF.
+    expect(html).toContain("AUTO-APPROVE");
+    expect(html).toContain('aria-checked="false"');
+    expect(html).toContain("stay hidden until you approve them");
+    // Opt-in ZIP link for the hidden queue sits under the main ZIP CTA.
+    expect(html).toContain("/api/events/e-1/download?include=pending");
+    expect(html).toContain("Include 1 hidden shot in the ZIP");
   });
 
   it("404s for an event the host does not own", async () => {

@@ -13,6 +13,8 @@ type EventRow = {
   status: string;
   uploads_close_at: string | null;
   storage_expires_at: string | null;
+  // FRI-30: opt-out of moderation — register inserts 'approved' directly.
+  auto_approve?: boolean;
 };
 
 const events: EventRow[] = [];
@@ -33,6 +35,7 @@ type MediaRow = {
   bytes: number;
   width: number | null;
   height: number | null;
+  status: string;
 };
 const mediaRows: MediaRow[] = [];
 const removed: string[] = [];
@@ -100,6 +103,7 @@ function mediaTable() {
         bytes: row.bytes as number,
         width: (row.width as number | null) ?? null,
         height: (row.height as number | null) ?? null,
+        status: (row.status as string) ?? "pending",
       });
       inserted.push(row);
       return {
@@ -249,15 +253,32 @@ describe("/api/uploads/register", () => {
         uploads_close_at: null,
         storage_expires_at: null,
       },
+      {
+        id: "evt-auto",
+        slug: "auto-approve-event-1",
+        name: "Auto-approve",
+        event_date: null,
+        pin: null,
+        status: "active",
+        uploads_close_at: null,
+        storage_expires_at: null,
+        auto_approve: true,
+      },
     );
   });
 
-  it("inserts a media row for an active event", async () => {
+  it("inserts a media row as 'pending' for an active event (FRI-30 default)", async () => {
     const res = await registerPOST(reqWith(baseBody()));
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { mediaId: string; duplicate: boolean };
+    const body = (await res.json()) as {
+      mediaId: string;
+      duplicate: boolean;
+      status: string;
+    };
     expect(body.mediaId).toBeTruthy();
     expect(body.duplicate).toBe(false);
+    // The guest UI learns the moderation outcome from the response.
+    expect(body.status).toBe("pending");
     expect(inserted).toHaveLength(1);
     expect(inserted[0]).toMatchObject({
       event_id: "evt-active",
@@ -266,6 +287,27 @@ describe("/api/uploads/register", () => {
       uploader_name: "Ada",
       content_hash: "deadbeef",
       kind: "photo",
+      // Approval required by default: uploads wait for the host.
+      status: "pending",
+    });
+  });
+
+  it("inserts as 'approved' when the event has auto_approve on", async () => {
+    const res = await registerPOST(
+      reqWith(
+        baseBody({
+          slug: "auto-approve-event-1",
+          path: "events/evt-auto/abc.jpg",
+        }),
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string };
+    expect(body.status).toBe("approved");
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({
+      event_id: "evt-auto",
+      status: "approved",
     });
   });
 

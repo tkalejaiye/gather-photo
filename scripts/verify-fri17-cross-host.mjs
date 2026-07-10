@@ -13,7 +13,7 @@
 //      Expects HTTP 404 (RLS / ownsEvent gate).
 //   4. Signs in as host-B and repeats the same POST as a positive control.
 //      Expects HTTP 200 with { deleted: [<the media id>] } and the row
-//      status flipping to 'deleted' in the DB.
+//      status flipping to 'rejected' in the DB (FRI-30 renamed 'deleted').
 //   5. Cleans up the users, event, and media rows regardless of outcome.
 //
 // This is the "manual" verification listed in the FRI-17 PR test plan,
@@ -156,6 +156,8 @@ try {
       kind: "photo",
       bytes: 1,
       content_hash: contentHash,
+      // FRI-30 renamed media statuses: approved is the old 'active'.
+      status: "approved",
     })
     .select("id")
     .single();
@@ -232,7 +234,7 @@ try {
       .eq("id", media.id)
       .single();
     if (error) throw error;
-    if (data.status === "active") ok(`host-B's media still status='active' in DB`);
+    if (data.status === "approved") ok(`host-B's media still status='approved' in DB`);
     else bad(`host-B's media status changed to '${data.status}' — cross-host attack succeeded`);
   }
 
@@ -258,8 +260,8 @@ try {
       .eq("id", media.id)
       .single();
     if (error) throw error;
-    if (data.status === "deleted") ok(`host-B's media flipped to status='deleted' in DB`);
-    else bad(`expected status='deleted', got '${data.status}'`);
+    if (data.status === "rejected") ok(`host-B's media flipped to status='rejected' in DB`);
+    else bad(`expected status='rejected', got '${data.status}'`);
   }
 } finally {
   await cleanup();

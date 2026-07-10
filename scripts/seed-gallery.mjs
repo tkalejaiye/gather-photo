@@ -113,6 +113,10 @@ for (let i = 0; i < count; i += 1) {
     width: 1,
     height: 1,
     content_hash: `seed-${event.id}-${i}`,
+    // FRI-30: mostly approved with a deterministic sprinkle of pending so
+    // the moderation queue (HIDDEN overlay, Hidden filter, approve flows)
+    // has something to render on a seeded event.
+    status: i % 7 === 0 ? "pending" : "approved",
   });
   if (rowErr) {
     failed += 1;

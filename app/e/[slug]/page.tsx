@@ -109,7 +109,7 @@ export default async function GuestUploadPage({ params, searchParams }: Props) {
       {/* FRI-21: the offline shell. A guest whose page won't load on a dead
           venue network can't drain the photos already queued in IndexedDB —
           an open page is what runs the uploader. */}
-      <RegisterServiceWorker />
+      <RegisterServiceWorker closeAt={event.uploads_close_at} />
       <GuestFlow
         slug={event.slug}
         eventId={event.id}

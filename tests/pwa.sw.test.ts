@@ -28,7 +28,12 @@ type FakeCache = {
 };
 
 function loadWorker(
-  options: { cacheNames?: string[]; offline?: boolean } = {},
+  options: {
+    cacheNames?: string[];
+    offline?: boolean;
+    quotaExceeded?: boolean;
+    redirected?: boolean;
+  } = {},
 ) {
   const listeners: Listeners = {};
   const caches_ = new Map<string, FakeCache>();
@@ -42,15 +47,22 @@ function loadWorker(
       cache = {
         entries,
         async put(req: unknown, res: unknown) {
-          entries.set(String((req as { url?: string }).url ?? req), res);
+          if (options.quotaExceeded) throw new Error("QuotaExceededError");
+          const key = String((req as { url?: string }).url ?? req);
+          entries.set(new URL(key, ORIGIN).href, res);
         },
         async add(url: string) {
           if (options.offline) throw new TypeError("Failed to fetch");
+          if (options.quotaExceeded) throw new Error("QuotaExceededError");
           fetched.push(url);
-          entries.set(url, { ok: true, added: true });
+          // The real Cache API keys by ABSOLUTE url, including for relative
+          // `add()` arguments — mirror that so a key mismatch between `add()`
+          // and `cacheFirst`'s `match(request)` would fail here too.
+          entries.set(new URL(url, ORIGIN).href, { ok: true, added: true });
         },
         async match(req: unknown) {
-          return entries.get(String((req as { url?: string }).url ?? req));
+          const key = String((req as { url?: string }).url ?? req);
+          return entries.get(new URL(key, ORIGIN).href);
         },
       };
       caches_.set(name, cache);
@@ -79,10 +91,24 @@ function loadWorker(
       fetched.push(typeof req === "string" ? req : req.url);
       // `offline` models a dead venue network: the browser rejects the fetch.
       if (options.offline) return Promise.reject(new TypeError("Failed to fetch"));
-      return Promise.resolve({ ok: true, type: "basic", clone: () => ({ body: "copy" }) });
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        type: "basic",
+        redirected: options.redirected === true,
+        headers: new Headers(),
+        blob: async () => new Blob(["<html>shell</html>"]),
+        clone: () => ({ body: "copy" }),
+      });
     },
     URL,
+    Headers,
+    Response,
     Promise,
+    Date,
+    Number,
+    Array,
     console,
   };
   vm.createContext(sandbox);
@@ -93,10 +119,19 @@ function loadWorker(
     caches_,
     deletedCaches,
     fetched,
-    /** Seed a cache entry the way a previous visit's `warm()` would have. */
-    async seed(cacheName: string, key: string, value: unknown) {
+    /** Seed a cache entry the way a previous visit's `warm()` would have.
+     *  `stamps` mirrors the headers `warm()` writes onto the stored shell. */
+    async seed(
+      cacheName: string,
+      key: string,
+      value: Record<string, unknown>,
+      stamps: Record<string, string> = { "x-gather-warmed": String(Date.now()) },
+    ) {
       const cache = await openCache(cacheName);
-      cache.entries.set(key, value);
+      cache.entries.set(new URL(key, ORIGIN).href, {
+        ...value,
+        headers: new Headers(stamps),
+      });
     },
     /** Deliver a postMessage to the worker and await its waitUntil. */
     async postMessage(data: unknown) {
@@ -272,7 +307,7 @@ describe("service worker — the guest shell", () => {
     });
     expect(claimed).toBe(true);
     // The whole point of the issue: a dead network still yields a shell.
-    expect(response).toEqual({ ok: true, cached: true });
+    expect(response).toMatchObject({ ok: true, cached: true });
   });
 
   it("serves the warmed shell for a slug reopened with a query string", async () => {
@@ -281,7 +316,7 @@ describe("service worker — the guest shell", () => {
     const { response } = await dispatchFetch(worker, `${ORIGIN}/e/roll-1?from=qr`, {
       mode: "navigate",
     });
-    expect(response).toEqual({ ok: true, cached: true });
+    expect(response).toMatchObject({ ok: true, cached: true });
   });
 
   it("propagates the network error when nothing is cached (no blank fake shell)", async () => {
@@ -307,7 +342,106 @@ describe("service worker — the guest shell", () => {
     const url = `${ORIGIN}/_next/static/chunks/main-abc123.js`;
     await worker.seed(ASSETS, url, { ok: true, cached: true });
     const { response } = await dispatchFetch(worker, url);
-    expect(response).toEqual({ ok: true, cached: true });
+    expect(response).toMatchObject({ ok: true, cached: true });
+    expect(worker.fetched).toEqual([]);
+  });
+});
+
+describe("service worker — surviving a full storage quota and a closed event", () => {
+  const SHELL = "gather-shell-v1";
+  const ASSETS = "gather-assets-v1";
+
+  it("still serves an asset when the cache write fails (quota shared with the photo queue)", async () => {
+    // The guest most likely to hit QuotaExceededError is the one with the most
+    // photos queued in IndexedDB — exactly the guest whose page must not break.
+    const worker = loadWorker({ quotaExceeded: true });
+    const url = `${ORIGIN}/_next/static/chunks/main-abc123.js`;
+    const { claimed, response } = await dispatchFetch(worker, url);
+    expect(claimed).toBe(true);
+    expect(response).toMatchObject({ ok: true, status: 200 });
+    expect(response).not.toBeInstanceOf(Error);
+  });
+
+  it("does not blow up warming when the quota is exhausted", async () => {
+    const worker = loadWorker({ quotaExceeded: true });
+    await expect(
+      worker.postMessage({
+        type: "gather-warm-shell",
+        url: `${ORIGIN}/e/roll-1`,
+        assets: [`${ORIGIN}/_next/static/chunks/main-abc.js`],
+      }),
+    ).resolves.not.toThrow();
+  });
+
+  it("refuses to serve a shell whose event has closed", async () => {
+    // A working picker for a closed event means the guest shoots into a queue
+    // whose every register will 404 on reconnect (lib/upload/server.ts).
+    const worker = loadWorker({ offline: true });
+    await worker.seed(
+      SHELL,
+      `${ORIGIN}/e/roll-1`,
+      { ok: true, cached: true },
+      {
+        "x-gather-warmed": String(Date.now()),
+        "x-gather-close-at": new Date(Date.now() - 60_000).toISOString(),
+      },
+    );
+    const { response } = await dispatchFetch(worker, `${ORIGIN}/e/roll-1`, { mode: "navigate" });
+    expect(response).toBeInstanceOf(TypeError);
+  });
+
+  it("still serves a shell whose event is open", async () => {
+    const worker = loadWorker({ offline: true });
+    await worker.seed(
+      SHELL,
+      `${ORIGIN}/e/roll-1`,
+      { ok: true, cached: true },
+      {
+        "x-gather-warmed": String(Date.now()),
+        "x-gather-close-at": new Date(Date.now() + 3_600_000).toISOString(),
+      },
+    );
+    const { response } = await dispatchFetch(worker, `${ORIGIN}/e/roll-1`, { mode: "navigate" });
+    expect(response).toMatchObject({ ok: true, cached: true });
+  });
+
+  it("re-warms a shell that is past its TTL, so the offline copy can't drift across deploys", async () => {
+    const worker = loadWorker();
+    await worker.seed(SHELL, `${ORIGIN}/e/roll-1`, { ok: true }, {
+      "x-gather-warmed": String(Date.now() - 7 * 60 * 60 * 1000),
+    });
+    await worker.postMessage({ type: "gather-warm-shell", url: `${ORIGIN}/e/roll-1`, assets: [] });
+    expect(worker.fetched).toEqual([`${ORIGIN}/e/roll-1`]);
+  });
+
+  it("refuses to bank a redirected response as the shell", async () => {
+    // A redirected response throws when handed back to a navigation later.
+    const worker = loadWorker({ redirected: true });
+    await worker.postMessage({ type: "gather-warm-shell", url: `${ORIGIN}/e/roll-1`, assets: [] });
+    expect(worker.caches_.get(SHELL)?.entries.size ?? 0).toBe(0);
+  });
+
+  it("caps one warm burst and ignores junk in the message", async () => {
+    const worker = loadWorker();
+    const many = Array.from(
+      { length: 200 },
+      (_, i) => `${ORIGIN}/_next/static/chunks/c${i}.js`,
+    );
+    await worker.postMessage({
+      type: "gather-warm-shell",
+      url: `${ORIGIN}/e/roll-1`,
+      assets: [...many, null, 42, "::::not a url::::"],
+    });
+    const assetFetches = worker.fetched.filter((u) => u.includes("/_next/static/"));
+    expect(assetFetches.length).toBe(60);
+    expect(worker.caches_.get(ASSETS)?.entries.size).toBe(60);
+  });
+
+  it("ignores a message with a non-string url instead of rejecting", async () => {
+    const worker = loadWorker();
+    await expect(
+      worker.postMessage({ type: "gather-warm-shell", url: { evil: true }, assets: [] }),
+    ).resolves.not.toThrow();
     expect(worker.fetched).toEqual([]);
   });
 });
@@ -338,9 +472,9 @@ describe("service worker — cache lifecycle", () => {
     await waited;
     const assets = worker.caches_.get("gather-assets-v1");
     expect([...(assets?.entries.keys() ?? [])].sort()).toEqual([
-      "/icon-192.png",
-      "/icon-512.png",
-      "/manifest.webmanifest",
+      `${ORIGIN}/icon-192.png`,
+      `${ORIGIN}/icon-512.png`,
+      `${ORIGIN}/manifest.webmanifest`,
     ]);
   });
 });

@@ -114,9 +114,10 @@ Code + tests for the acceptance criteria · `typecheck` + `lint` + `build` + `te
 ## 8. Operations — service worker kill switch (FRI-21)
 
 The guest route registers `public/sw.js`, which makes `/e/{slug}` open when the
-venue network is down. It is network-first for HTML, so it cannot pin guests to
-a stale shell — but if it ever misbehaves in the field, kill it *without* a code
-rollback:
+venue network is down. It is network-first for HTML, so an **online** guest is
+always on the current build, and the cached **offline** copy is refreshed once
+it is older than `SHELL_TTL_MS` (6h) — it cannot pin a venue to an old bundle.
+If it ever misbehaves in the field, kill it *without* a code rollback:
 
 ```bash
 cp docs/sw-kill-switch.js public/sw.js   # keep the /sw.js path
@@ -129,7 +130,9 @@ every `gather-*` cache, unregister, and reload open tabs onto the live network
 path. Reverting the file re-enables the shell.
 
 Bumping `VERSION` in `public/sw.js` is the softer lever: it drops every cached
-shell and asset on the next visit while keeping the worker installed.
+shell and asset on the next visit while keeping the worker installed. Bump it
+whenever `public/manifest.webmanifest` or the icons change — those are served
+cache-first and are otherwise pinned for the lifetime of a `VERSION`.
 
 `docs/sw-kill-switch.js` also documents why removing the registration from the
 guest page is *not* sufficient on its own.

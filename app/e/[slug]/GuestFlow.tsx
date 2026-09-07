@@ -259,6 +259,26 @@ export function GuestFlow({
       }
       const { startAutoDrain } = await import("@/lib/upload/uploader");
       cleanup = startAutoDrain();
+      // FRI-21 offline-readiness: the compressor is dynamically imported at
+      // pick time (bundle budget, TECH_SPEC §8). If the venue network dies
+      // between page load and the guest picking a photo, that import can't
+      // resolve and the shot never reaches the queue — the offline shell would
+      // open onto a flow that can't accept a photo. Pull the chunk in while a
+      // network still exists, at idle so it never races first paint or an
+      // in-flight upload. The service worker banks it (cache-first on
+      // /_next/static/), so it survives a reload too. Note the deliberate
+      // gap: heic2any's wasm is megabytes (lib/image/compress.ts) and is NOT
+      // prefetched, so an iPhone guest who goes offline and then picks a raw
+      // HEIC still can't enqueue. Prefetching it would cost every guest on a
+      // 3G connection more than it saves that one.
+      if (typeof navigator === "undefined" || navigator.onLine !== false) {
+        const idle =
+          (window as Window & { requestIdleCallback?: (cb: () => void) => void })
+            .requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1500));
+        idle(() => {
+          void import("@/lib/image/compress");
+        });
+      }
     })();
     return () => {
       cancelled = true;

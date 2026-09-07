@@ -12,13 +12,13 @@
   "type": "XHR"
  },
  {
-  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy83ZGUzYWIwNS1hODk2LTQ5N2UtYjFiNi00MWIzZjJlZDk1ZjQuanBnLzNkOTkxMzc5LTFiNGYtNDAzMC1iMGZkLWMzNmEzZjVhYzNkYw",
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy8zYWI5NDA0ZS0zODBiLTRhOWEtODMxNS0wOGMyMzNlM2NkZWUuanBnL2IxMTJmZTBkLTBlNmUtNDExYi1hY2YzLWQ0NDM2YjE5ZmFhMg",
   "status": 200,
   "fromServiceWorker": false,
   "type": "Preflight"
  },
  {
-  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy83ZGUzYWIwNS1hODk2LTQ5N2UtYjFiNi00MWIzZjJlZDk1ZjQuanBnLzNkOTkxMzc5LTFiNGYtNDAzMC1iMGZkLWMzNmEzZjVhYzNkYw",
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy8zYWI5NDA0ZS0zODBiLTRhOWEtODMxNS0wOGMyMzNlM2NkZWUuanBnL2IxMTJmZTBkLTBlNmUtNDExYi1hY2YzLWQ0NDM2YjE5ZmFhMg",
   "status": 204,
   "fromServiceWorker": false,
   "type": "XHR"
@@ -42,13 +42,13 @@
   "type": "XHR"
  },
  {
-  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy84Y2Y4Mzk0Yi1hNGQ1LTRmYjQtYTFkZS1lODJlN2UxNmQyNDguanBnLzM3NGFiMTdlLTA0ODUtNGJhOC1hOTBkLTY0YjllODk1ZDAwNw",
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy9jMWY0NDY4Yy1kZDY1LTQxYjYtOGY4Mi03ZmIzOGUzMjgxZjEuanBnLzdiZjg0NGM3LTljMjAtNDZkYy1iMTk3LWMxMjg3NzgwZmNjNA",
   "status": 200,
   "fromServiceWorker": false,
   "type": "Preflight"
  },
  {
-  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy84Y2Y4Mzk0Yi1hNGQ1LTRmYjQtYTFkZS1lODJlN2UxNmQyNDguanBnLzM3NGFiMTdlLTA0ODUtNGJhOC1hOTBkLTY0YjllODk1ZDAwNw",
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy9jMWY0NDY4Yy1kZDY1LTQxYjYtOGY4Mi03ZmIzOGUzMjgxZjEuanBnLzdiZjg0NGM3LTljMjAtNDZkYy1iMTk3LWMxMjg3NzgwZmNjNA",
   "status": 204,
   "fromServiceWorker": false,
   "type": "XHR"
@@ -78,13 +78,13 @@
   "type": "Stylesheet"
  },
  {
-  "url": "http://localhost:3000/_next/static/media/806de4d605d3ad01-s.p.woff2",
+  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
   "status": 200,
   "fromServiceWorker": true,
   "type": "Font"
  },
  {
-  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
+  "url": "http://localhost:3000/_next/static/media/806de4d605d3ad01-s.p.woff2",
   "status": 200,
   "fromServiceWorker": true,
   "type": "Font"
@@ -114,7 +114,7 @@
   "type": "Script"
  },
  {
-  "url": "http://localhost:3000/_next/static/chunks/app/e/%5Bslug%5D/page-bedd4f687cbd70a3.js",
+  "url": "http://localhost:3000/_next/static/chunks/app/e/%5Bslug%5D/page-c3b9138707775268.js",
   "status": 200,
   "fromServiceWorker": true,
   "type": "Script"
@@ -132,12 +132,6 @@
   "type": "Script"
  },
  {
-  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
-  "status": 200,
-  "fromServiceWorker": true,
-  "type": "Font"
- },
- {
   "url": "http://localhost:3000/_next/static/media/806de4d605d3ad01-s.p.woff2",
   "status": 200,
   "fromServiceWorker": true,
@@ -145,6 +139,12 @@
  },
  {
   "url": "http://localhost:3000/_next/static/media/fc727f226c737876-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
   "status": 200,
   "fromServiceWorker": true,
   "type": "Font"
@@ -187,6 +187,18 @@
  },
  {
   "url": "http://localhost:3000/_next/static/chunks/912.34b8b2303eaad658.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/362.97762525ecba8c69.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/107.1caac55e2366e8b1.js",
   "status": 200,
   "fromServiceWorker": true,
   "type": "Script"
@@ -204,19 +216,13 @@
   "type": "Font"
  },
  {
-  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
-  "status": 200,
-  "fromServiceWorker": false,
-  "type": "Font"
- },
- {
   "url": "http://localhost:3000/_next/static/media/1a4aa50920b5315c-s.p.woff2",
   "status": 200,
   "fromServiceWorker": false,
   "type": "Font"
  },
  {
-  "url": "http://localhost:3000/_next/static/media/fc727f226c737876-s.p.woff2",
+  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
   "status": 200,
   "fromServiceWorker": false,
   "type": "Font"
@@ -234,10 +240,10 @@
   "type": "Stylesheet"
  },
  {
-  "url": "http://localhost:3000/_next/static/chunks/webpack-1a7b49294b427466.js",
+  "url": "http://localhost:3000/_next/static/media/fc727f226c737876-s.p.woff2",
   "status": 200,
   "fromServiceWorker": false,
-  "type": "Script"
+  "type": "Font"
  },
  {
   "url": "http://localhost:3000/_next/static/chunks/main-app-959ef71092a79a99.js",
@@ -246,7 +252,13 @@
   "type": "Script"
  },
  {
-  "url": "http://localhost:3000/_next/static/chunks/app/e/%5Bslug%5D/page-bedd4f687cbd70a3.js",
+  "url": "http://localhost:3000/_next/static/chunks/webpack-1a7b49294b427466.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/app/e/%5Bslug%5D/page-c3b9138707775268.js",
   "status": 200,
   "fromServiceWorker": false,
   "type": "Script"
@@ -295,6 +307,18 @@
  },
  {
   "url": "http://localhost:3000/_next/static/chunks/912.34b8b2303eaad658.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/362.97762525ecba8c69.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/107.1caac55e2366e8b1.js",
   "status": 200,
   "fromServiceWorker": false,
   "type": "Script"
@@ -306,25 +330,7 @@
   "type": "Document"
  },
  {
-  "url": "http://localhost:3000/_next/static/css/813389e60a57eea2.css",
-  "status": 200,
-  "fromServiceWorker": false,
-  "type": "Stylesheet"
- },
- {
-  "url": "http://localhost:3000/_next/static/css/40ec0b59f80d99df.css",
-  "status": 200,
-  "fromServiceWorker": false,
-  "type": "Stylesheet"
- },
- {
   "url": "http://localhost:3000/_next/static/media/806de4d605d3ad01-s.p.woff2",
-  "status": 200,
-  "fromServiceWorker": false,
-  "type": "Font"
- },
- {
-  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
   "status": 200,
   "fromServiceWorker": false,
   "type": "Font"
@@ -340,6 +346,24 @@
   "status": 200,
   "fromServiceWorker": false,
   "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/css/40ec0b59f80d99df.css",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Stylesheet"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/css/813389e60a57eea2.css",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Stylesheet"
  },
  {
   "url": "http://localhost:3000/manifest.webmanifest",
@@ -360,7 +384,7 @@
   "type": "Script"
  },
  {
-  "url": "http://localhost:3000/_next/static/chunks/app/e/%5Bslug%5D/page-bedd4f687cbd70a3.js",
+  "url": "http://localhost:3000/_next/static/chunks/app/e/%5Bslug%5D/page-c3b9138707775268.js",
   "status": 200,
   "fromServiceWorker": false,
   "type": "Script"
@@ -390,19 +414,31 @@
   "type": "Script"
  },
  {
-  "url": "http://localhost:3000/_next/static/chunks/461.4f7afef64289e1af.js",
-  "status": 200,
-  "fromServiceWorker": false,
-  "type": "Script"
- },
- {
   "url": "http://localhost:3000/icon-192.png",
   "status": 200,
   "fromServiceWorker": false,
   "type": "Other"
  },
  {
+  "url": "http://localhost:3000/_next/static/chunks/461.4f7afef64289e1af.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
   "url": "http://localhost:3000/_next/static/chunks/912.34b8b2303eaad658.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/362.97762525ecba8c69.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/107.1caac55e2366e8b1.js",
   "status": 200,
   "fromServiceWorker": false,
   "type": "Script"

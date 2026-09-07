@@ -2,7 +2,7 @@
   "name": "gather-photo",
   "version": "0.1.0",
   "private": true,
-  "description": "gather.photo — collect every guest's photos at an event via QR code. No app, no login.",
+  "description": "gather.photo \u2014 collect every guest's photos at an event via QR code. No app, no login.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -14,6 +14,7 @@
     "verify:supabase": "node --env-file=.env.local scripts/verify-supabase.mjs",
     "verify:fri17": "node --env-file=.env.local scripts/verify-fri17-cross-host.mjs",
     "verify:fri18": "node --env-file=.env.local --expose-gc scripts/verify-fri18-download-memory.mjs",
+    "verify:fri44": "node --env-file=.env.local scripts/verify-fri44-storage-rls.mjs",
     "seed:gallery": "node --env-file=.env.local scripts/seed-gallery.mjs"
   },
   "dependencies": {

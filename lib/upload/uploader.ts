@@ -25,6 +25,7 @@ import {
   getByStatus,
   markDone,
   markFailed,
+  pauseForOffline,
   requeue,
   setProgress,
   setTusUploadUrl,
@@ -106,6 +107,12 @@ export interface UploaderDeps {
   inFlightCap: number;
   /** Max failed→queued promotions per item before we stop auto-retrying it. */
   maxAttempts: number;
+  /**
+   * True only when the browser is certain there is no network. Injected so the
+   * offline path is drivable from the vitest `node` env, which has no
+   * `navigator` (FRI-41).
+   */
+  isOffline: () => boolean;
   /** Passed through to every queue call so tests can inject an in-memory shim. */
   queue: Partial<QueueDeps>;
 }
@@ -120,6 +127,17 @@ async function defaultLoadTus(): Promise<TusModule> {
 
 function defaultFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   return globalThis.fetch(input, init);
+}
+
+/**
+ * `navigator.onLine === false` is the browser's only *positive* assertion that
+ * there is no network. A `true` value asserts nothing useful — a captive portal
+ * or a saturated venue AP still reports "online" — so we treat only the
+ * definite-false case as a pause. Everything else stays a real failure with a
+ * real error message (FRI-41).
+ */
+function defaultIsOffline(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
 }
 
 /**
@@ -151,6 +169,7 @@ const defaultDeps: UploaderDeps = {
   tusHeaders: defaultTusHeaders(),
   inFlightCap: DEFAULT_IN_FLIGHT_CAP,
   maxAttempts: MAX_ATTEMPTS,
+  isOffline: defaultIsOffline,
   queue: {},
 };
 
@@ -167,12 +186,12 @@ let draining = false;
  */
 export async function drainQueue(overrides: Partial<UploaderDeps> = {}): Promise<void> {
   if (draining) return;
-  // navigator.onLine only exists in the browser; when it's present and false
-  // we bail early — the `online` listener will re-trigger us on reconnect.
-  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+  const deps = { ...defaultDeps, ...overrides };
+  // When the browser is certain it has no network we bail before claiming
+  // anything — the `online` listener will re-trigger us on reconnect.
+  if (deps.isOffline()) return;
   draining = true;
   try {
-    const deps = { ...defaultDeps, ...overrides };
     // Promote failed + stranded items back to `queued` so this drain retries them.
     //   - `failed`: exhausted tus-js-client's per-connection retries; the
     //     `online` event and app reopen is the sanctioned retry point.
@@ -193,6 +212,12 @@ export async function drainQueue(overrides: Partial<UploaderDeps> = {}): Promise
     // (or items freed up by the in-flight cap) get picked up in the next
     // claim without needing an external re-entry.
     while (true) {
+      // Connectivity can drop *during* a drain. Claiming another item now
+      // charges it an attempt (claimNext bumps `attempts`) for an upload that
+      // cannot start, so one offline episode would cascade through the whole
+      // batch in seconds — the FRI-41 defect. Stop claiming and let the
+      // `online` listener open a fresh drain.
+      if (deps.isOffline()) break;
       const claimed = await claimNext(deps.inFlightCap, deps.queue);
       if (claimed.length === 0) break;
       await Promise.all(claimed.map((item) => uploadOne(item, tus, deps)));
@@ -285,10 +310,21 @@ function uploadOne(
         void finishUpload(item, deps).then(resolve);
       },
       onError: (err) => {
-        // tus-js-client has already burned through `retryDelays` before it
-        // gets here. Surface the error so the guest sees a clear failed
-        // state — the queue keeps the blob and the URL, so a retry (manual
-        // or via a later `online` event) resumes from the last committed byte.
+        // Hard-offline is not this photo's fault. tus-js-client's default
+        // `onShouldRetry` checks navigator.onLine and errors out immediately
+        // without touching `retryDelays`, so calling this a failure would
+        // charge an attempt for an upload that never left the device. Park it
+        // back in `queued` with the attempt refunded and let the `online`
+        // drain resume it from the last committed byte (FRI-41).
+        if (deps.isOffline()) {
+          void pauseForOffline(item.id, deps.queue).then(resolve);
+          return;
+        }
+        // Genuine failure: tus-js-client has already burned through
+        // `retryDelays` before it gets here. Surface the error so the guest
+        // sees a clear failed state — the queue keeps the blob and the URL,
+        // so a retry (manual or via a later `online` event) resumes from the
+        // last committed byte.
         const message = err?.message ?? "Upload failed";
         void markFailed(item.id, message, deps.queue).then(resolve);
       },
@@ -326,7 +362,14 @@ async function finishUpload(item: UploadItem, deps: UploaderDeps): Promise<void>
     }
     await markDone(item.id, deps.queue);
   } catch (err) {
-    // Network error hitting /api/uploads/register — same recovery as above.
+    // Network error hitting /api/uploads/register. If we're hard-offline the
+    // bytes are already in Storage and only the row is missing, so this is a
+    // pause too: the `online` drain re-runs the upload, tus HEADs a complete
+    // object, fires onSuccess straight away, and we re-register (FRI-41).
+    if (deps.isOffline()) {
+      await pauseForOffline(item.id, deps.queue);
+      return;
+    }
     const msg = err instanceof Error ? err.message : "Register failed";
     await markFailed(item.id, msg, deps.queue);
   }

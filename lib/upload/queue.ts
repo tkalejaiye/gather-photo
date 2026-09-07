@@ -314,6 +314,38 @@ export async function requeue(
   });
 }
 
+/**
+ * Park an item back in 'queued' after a hard-offline error, WITHOUT charging it
+ * an attempt (FRI-41).
+ *
+ * `claimNext` bumps `attempts` at claim time, not at failure time, so an upload
+ * that never left the device has still spent one of its `maxAttempts`. At a
+ * venue with flapping Wi-Fi that arithmetic strands a perfectly good photo in
+ * `failed` after five drops — the exact scenario TECH_SPEC §5/§10 targets. Hand
+ * the attempt back so only real, online failures count against the cap.
+ *
+ * Two deliberate differences from `requeue`:
+ *   - `progress` is preserved, not reset to 0. The bytes already committed to
+ *     Supabase Storage are still there and tus-js-client resumes from that
+ *     offset via `tusUploadUrl`, so showing the guest 0% would be a lie.
+ *   - `attempts` is decremented (floored at 0) rather than left alone.
+ */
+export async function pauseForOffline(
+  id: string,
+  overrides: Partial<QueueDeps> = {},
+): Promise<void> {
+  await mutate(id, overrides, (existing) => {
+    // Without bytes there is nothing to resume — leave the row alone.
+    if (existing.data === null) return existing;
+    return {
+      ...existing,
+      status: "queued",
+      attempts: Math.max(0, existing.attempts - 1),
+      lastError: undefined,
+    };
+  });
+}
+
 export async function remove(
   id: string,
   overrides: Partial<QueueDeps> = {},

@@ -655,3 +655,205 @@ describe("drainQueue — concurrency + emptiness", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
+
+// ────────────────────────────────────────────────────────────
+// FRI-41: hard-offline is a pause, not a failure.
+//
+// tus-js-client's default `onShouldRetry` consults navigator.onLine and errors
+// out immediately when it's false — it never touches `retryDelays`. Because
+// `claimNext` charges an attempt at claim time, the pre-FRI-41 engine spent one
+// of MAX_ATTEMPTS on every offline blip for an upload that never left the
+// device. Five flaps of a venue AP and a perfectly good photo stranded itself
+// in `failed`. These tests pin the new contract: offline episodes are free,
+// online failures still cost.
+// ────────────────────────────────────────────────────────────
+
+/**
+ * A tus fake that drops the way a real hard-offline drop looks: commit
+ * `bytesBeforeDrop` bytes (so there is a real offset to resume from), flip the
+ * caller's connectivity flag, then error immediately without any retry wait.
+ */
+function makeGoesOfflineTus(
+  server: FakeTusServer,
+  bytesBeforeDrop: number,
+  goOffline: () => void,
+): TusModule {
+  let urlCounter = 0;
+  class OfflineUpload implements TusUpload {
+    url: string | null;
+    constructor(
+      private blob: Blob,
+      private opts: TusUploadOptions,
+    ) {
+      this.url = opts.uploadUrl ?? null;
+    }
+    async start(): Promise<void> {
+      if (!this.url) {
+        urlCounter += 1;
+        this.url = `https://fake-tus.local/offline/${urlCounter}`;
+        server.createSlot(this.url, this.blob.size);
+      }
+      this.opts.onUploadUrlAvailable?.();
+      const url = this.url;
+      const start = server.committedOffset(url);
+      const step = Math.min(bytesBeforeDrop, this.blob.size - start);
+      if (step > 0) {
+        server.receive(url, step);
+        this.opts.onProgress(start + step, this.blob.size);
+        await Promise.resolve();
+      }
+      goOffline();
+      this.opts.onError(new Error("tus: failed to upload, network offline"));
+    }
+    async abort(): Promise<void> {}
+  }
+  return { Upload: OfflineUpload };
+}
+
+describe("drainQueue — hard-offline pause (FRI-41)", () => {
+  it("parks the item back in queued instead of failing it, keeping progress", async () => {
+    const store = makeStore();
+    const server = new FakeTusServer();
+    let offline = false;
+    const tus = makeGoesOfflineTus(server, 3_000, () => {
+      offline = true;
+    });
+    const fetchMock = vi.fn(async () => jsonResponse({ mediaId: "m1", duplicate: false }));
+
+    const item = await enqueue(makeInput(), queueDeps(store));
+    await drainQueue(
+      makeDeps(store, tus, fetchMock, { isOffline: () => offline }),
+    );
+
+    const stored = await get(item.id, queueDeps(store));
+    expect(stored?.status).toBe("queued");
+    // No red error state for something that isn't the photo's fault.
+    expect(stored?.lastError).toBeUndefined();
+    // Bytes retained so the resume has something to send.
+    expect(stored?.data).toBeInstanceOf(ArrayBuffer);
+    // Progress is NOT reset — those 3000 bytes are committed server-side and
+    // tus will resume from that offset, so showing 0% would be a lie.
+    expect(stored?.progress).toBeCloseTo(3_000 / 8_000);
+    // The register call never happened.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not spend an attempt — six offline episodes still leave the item retryable", async () => {
+    const store = makeStore();
+    const server = new FakeTusServer();
+    let offline = false;
+    const offlineTus = makeGoesOfflineTus(server, 1_000, () => {
+      offline = true;
+    });
+    const fetchMock = vi.fn(async () => jsonResponse({ mediaId: "m1", duplicate: false }));
+
+    const item = await enqueue(makeInput(), queueDeps(store));
+
+    // Six flaps of the venue AP — more than MAX_ATTEMPTS, which is the whole
+    // point: none of them may count.
+    for (let i = 0; i < 6; i++) {
+      offline = false; // the `online` event fired; a fresh drain starts
+      resetUploader();
+      await drainQueue(
+        makeDeps(store, offlineTus, fetchMock, { isOffline: () => offline }),
+      );
+      const mid = await get(item.id, queueDeps(store));
+      expect(mid?.status).toBe("queued");
+      expect(mid?.attempts).toBe(0);
+    }
+
+    // Now the network actually comes back and the normal engine finishes it.
+    offline = false;
+    resetUploader();
+    const hooks: FakeTusHooks = { dropped: new Set() };
+    await drainQueue(
+      makeDeps(store, makeFakeTus(server, hooks), fetchMock, {
+        isOffline: () => offline,
+      }),
+    );
+
+    const final = await get(item.id, queueDeps(store));
+    expect(final?.status).toBe("done");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // And it resumed rather than restarting: the server saw each byte once.
+    const url = [...server.totalBytesReceived.keys()][0];
+    expect(server.totalBytesReceived.get(url)).toBe(8_000);
+  });
+
+  it("stops claiming the rest of the batch when connectivity drops mid-drain", async () => {
+    const store = makeStore();
+    const server = new FakeTusServer();
+    let offline = false;
+    const tus = makeGoesOfflineTus(server, 500, () => {
+      offline = true;
+    });
+    const fetchMock = vi.fn(async () => jsonResponse({ mediaId: "m1", duplicate: false }));
+
+    for (let i = 0; i < 3; i++) {
+      await enqueue(makeInput({ data: makeData(4_000, i), bytes: 4_000 }), queueDeps(store));
+    }
+
+    await drainQueue(
+      makeDeps(store, tus, fetchMock, { isOffline: () => offline }),
+    );
+
+    // All three are still queued...
+    const queued = await getByStatus(["queued"], queueDeps(store));
+    expect(queued).toHaveLength(3);
+    // ...but only the one that was in flight was ever claimed, and even it was
+    // refunded. The other two were never touched, so the batch didn't cascade.
+    for (const row of queued) {
+      expect(row.attempts).toBe(0);
+      expect(row.status).toBe("queued");
+    }
+    // Exactly one upload was attempted before the loop bailed out.
+    expect(server.totalBytesReceived.size).toBe(1);
+  });
+
+  it("pauses rather than fails when the register call dies offline", async () => {
+    // TUS finished — the bytes are in Storage — but /api/uploads/register
+    // never got a response. The row is missing, not the photo, so this is a
+    // pause: the reconnect drain re-runs the upload, tus HEADs a complete
+    // object, and we re-register.
+    const store = makeStore();
+    const server = new FakeTusServer();
+    const hooks: FakeTusHooks = { dropped: new Set() };
+    const tus = makeFakeTus(server, hooks);
+    let offline = false;
+    const fetchMock: UploaderDeps["fetch"] = vi.fn(async () => {
+      offline = true;
+      throw new Error("fetch failed");
+    });
+
+    const item = await enqueue(makeInput(), queueDeps(store));
+    await drainQueue(
+      makeDeps(store, tus, fetchMock, { isOffline: () => offline }),
+    );
+
+    const stored = await get(item.id, queueDeps(store));
+    expect(stored?.status).toBe("queued");
+    expect(stored?.lastError).toBeUndefined();
+    expect(stored?.attempts).toBe(0);
+    expect(stored?.data).toBeInstanceOf(ArrayBuffer);
+  });
+
+  it("a genuine failure while online still fails and still costs an attempt", async () => {
+    // The guard against over-applying the pause: if the browser believes it is
+    // online, nothing changes from the pre-FRI-41 behaviour.
+    const store = makeStore();
+    const server = new FakeTusServer();
+    const hooks: FakeTusHooks = { dropAfterBytes: 2_000, dropped: new Set() };
+    const tus = makeFakeTus(server, hooks);
+    const fetchMock = vi.fn(async () => jsonResponse({ mediaId: "m1", duplicate: false }));
+
+    const item = await enqueue(makeInput(), queueDeps(store));
+    await drainQueue(
+      makeDeps(store, tus, fetchMock, { isOffline: () => false }),
+    );
+
+    const stored = await get(item.id, queueDeps(store));
+    expect(stored?.status).toBe("failed");
+    expect(stored?.lastError).toBe("simulated network drop");
+    expect(stored?.attempts).toBe(1);
+  });
+});

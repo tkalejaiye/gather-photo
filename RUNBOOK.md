@@ -108,3 +108,28 @@ git worktree add ../gather-photo-fri10 -b feat/fri-10-compression
 
 ## 7. Definition of Done (every issue)
 Code + tests for the acceptance criteria · `typecheck` + `lint` + `build` + `test` pass · verification evidence shown · `spec-reviewer` diff review (fix correctness/requirement gaps only) · PR opened linking the Linear issue · issue moved to **In Review**.
+
+---
+
+## 8. Operations — service worker kill switch (FRI-21)
+
+The guest route registers `public/sw.js`, which makes `/e/{slug}` open when the
+venue network is down. It is network-first for HTML, so it cannot pin guests to
+a stale shell — but if it ever misbehaves in the field, kill it *without* a code
+rollback:
+
+```bash
+cp docs/sw-kill-switch.js public/sw.js   # keep the /sw.js path
+git commit -am "ops: disable service worker" && deploy
+```
+
+Installed workers on guests' phones poll `/sw.js` on the next navigation
+(served `max-age=0, must-revalidate`), install the kill-switch worker, delete
+every `gather-*` cache, unregister, and reload open tabs onto the live network
+path. Reverting the file re-enables the shell.
+
+Bumping `VERSION` in `public/sw.js` is the softer lever: it drops every cached
+shell and asset on the next visit while keeping the worker installed.
+
+`docs/sw-kill-switch.js` also documents why removing the registration from the
+guest page is *not* sufficient on its own.

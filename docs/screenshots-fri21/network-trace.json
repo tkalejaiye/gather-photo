@@ -1,0 +1,410 @@
+[
+ {
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Preflight"
+ },
+ {
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable",
+  "status": 201,
+  "fromServiceWorker": false,
+  "type": "XHR"
+ },
+ {
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy83ZGUzYWIwNS1hODk2LTQ5N2UtYjFiNi00MWIzZjJlZDk1ZjQuanBnLzNkOTkxMzc5LTFiNGYtNDAzMC1iMGZkLWMzNmEzZjVhYzNkYw",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Preflight"
+ },
+ {
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy83ZGUzYWIwNS1hODk2LTQ5N2UtYjFiNi00MWIzZjJlZDk1ZjQuanBnLzNkOTkxMzc5LTFiNGYtNDAzMC1iMGZkLWMzNmEzZjVhYzNkYw",
+  "status": 204,
+  "fromServiceWorker": false,
+  "type": "XHR"
+ },
+ {
+  "url": "http://localhost:3000/api/uploads/register",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Fetch"
+ },
+ {
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Preflight"
+ },
+ {
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable",
+  "status": 201,
+  "fromServiceWorker": false,
+  "type": "XHR"
+ },
+ {
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy84Y2Y4Mzk0Yi1hNGQ1LTRmYjQtYTFkZS1lODJlN2UxNmQyNDguanBnLzM3NGFiMTdlLTA0ODUtNGJhOC1hOTBkLTY0YjllODk1ZDAwNw",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Preflight"
+ },
+ {
+  "url": "https://cwmirfypppjneykrtftn.supabase.co/storage/v1/upload/resumable/ZXZlbnQtbWVkaWEvZXZlbnRzLzM3NWRlZjljLTY3ZjgtNGQ0ZS05ODM4LWQzNzI5OWVjOWEyNy84Y2Y4Mzk0Yi1hNGQ1LTRmYjQtYTFkZS1lODJlN2UxNmQyNDguanBnLzM3NGFiMTdlLTA0ODUtNGJhOC1hOTBkLTY0YjllODk1ZDAwNw",
+  "status": 204,
+  "fromServiceWorker": false,
+  "type": "XHR"
+ },
+ {
+  "url": "http://localhost:3000/api/uploads/register",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Fetch"
+ },
+ {
+  "url": "http://localhost:3000/e/v9g8ha53whjvzs",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Document"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/css/40ec0b59f80d99df.css",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Stylesheet"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/css/813389e60a57eea2.css",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Stylesheet"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/806de4d605d3ad01-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/1a4aa50920b5315c-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/fc727f226c737876-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/main-app-959ef71092a79a99.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/webpack-1a7b49294b427466.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/app/e/%5Bslug%5D/page-bedd4f687cbd70a3.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/23-f8240e5c0d71ae89.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/fd9d1056-a259a92828d2b4e1.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/806de4d605d3ad01-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/fc727f226c737876-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/1a4aa50920b5315c-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/manifest.webmanifest",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Manifest"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/320.ab996b320602cb9b.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/470.ac9e58e1e3cdf867.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/icon-192.png",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Other"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/461.4f7afef64289e1af.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/912.34b8b2303eaad658.js",
+  "status": 200,
+  "fromServiceWorker": true,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/e/v9g8ha53whjvzs",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Document"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/806de4d605d3ad01-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/1a4aa50920b5315c-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/fc727f226c737876-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/css/813389e60a57eea2.css",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Stylesheet"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/css/40ec0b59f80d99df.css",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Stylesheet"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/webpack-1a7b49294b427466.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/main-app-959ef71092a79a99.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/app/e/%5Bslug%5D/page-bedd4f687cbd70a3.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/manifest.webmanifest",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Manifest"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/23-f8240e5c0d71ae89.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/fd9d1056-a259a92828d2b4e1.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/320.ab996b320602cb9b.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/470.ac9e58e1e3cdf867.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/icon-192.png",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Other"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/461.4f7afef64289e1af.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/912.34b8b2303eaad658.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/e/v9g8ha53whjvzs",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Document"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/css/813389e60a57eea2.css",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Stylesheet"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/css/40ec0b59f80d99df.css",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Stylesheet"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/806de4d605d3ad01-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/982ceffe7b733b3b-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/fc727f226c737876-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/media/1a4aa50920b5315c-s.p.woff2",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Font"
+ },
+ {
+  "url": "http://localhost:3000/manifest.webmanifest",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Manifest"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/main-app-959ef71092a79a99.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/webpack-1a7b49294b427466.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/app/e/%5Bslug%5D/page-bedd4f687cbd70a3.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/23-f8240e5c0d71ae89.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/fd9d1056-a259a92828d2b4e1.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/320.ab996b320602cb9b.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/470.ac9e58e1e3cdf867.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/461.4f7afef64289e1af.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ },
+ {
+  "url": "http://localhost:3000/icon-192.png",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Other"
+ },
+ {
+  "url": "http://localhost:3000/_next/static/chunks/912.34b8b2303eaad658.js",
+  "status": 200,
+  "fromServiceWorker": false,
+  "type": "Script"
+ }
+]

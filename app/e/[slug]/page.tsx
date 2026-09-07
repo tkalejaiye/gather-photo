@@ -7,6 +7,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { Eyebrow } from "@/components/ui/eyebrow";
 import { Polaroid } from "@/components/ui/polaroid";
 import { ScreenShell } from "@/components/ui/screen-shell";
+import { RegisterServiceWorker } from "@/components/pwa/register-service-worker";
 import { GuestFlow } from "./GuestFlow";
 import { PinForm } from "./PinForm";
 
@@ -16,6 +17,7 @@ import { PinForm } from "./PinForm";
 // FRI-9: name + uploader_token in localStorage, camera + multi-select shell.
 // M1: capture/select → compress → single upload.
 // M2: IndexedDB queue + resumable TUS + offline resume + progress UI.
+// FRI-21: service-worker offline shell so the page opens on a dead network.
 // FRI-34: Daylight redesign — Landing/Name/Picker/Uploading/Success flow
 // (design/daylight/README.md §Screens 1–5) + restyled PIN/ended states.
 
@@ -104,6 +106,10 @@ export default async function GuestUploadPage({ params, searchParams }: Props) {
 
   return (
     <ScreenShell contentClassName="mx-auto w-full max-w-[440px]">
+      {/* FRI-21: the offline shell. A guest whose page won't load on a dead
+          venue network can't drain the photos already queued in IndexedDB —
+          an open page is what runs the uploader. */}
+      <RegisterServiceWorker />
       <GuestFlow
         slug={event.slug}
         eventId={event.id}

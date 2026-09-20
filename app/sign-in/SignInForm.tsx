@@ -110,7 +110,7 @@ export function SignInForm({ initialMode, initialError, googleEnabled }: Props) 
   }
 
   const wrapper = cx(
-    "mx-auto flex min-h-dvh w-full max-w-[440px] flex-col pb-10 pt-[70px]",
+    "mx-auto flex min-h-svh w-full max-w-[440px] flex-col pb-10 pt-[70px]",
     "lg:mx-0 lg:min-h-0 lg:max-w-[400px] lg:p-0",
   );
 

@@ -108,3 +108,36 @@ git worktree add ../gather-photo-fri10 -b feat/fri-10-compression
 
 ## 7. Definition of Done (every issue)
 Code + tests for the acceptance criteria · `typecheck` + `lint` + `build` + `test` pass · verification evidence shown · `spec-reviewer` diff review (fix correctness/requirement gaps only) · PR opened linking the Linear issue · issue moved to **In Review**.
+
+---
+
+## 8. Testing a Vercel preview deployment
+
+Preview deploys are only useful if you can get *past* `/sign-in` on them. Two
+things have to line up — the app has to ask Supabase to send you back to the
+preview, and Supabase has to be willing to.
+
+**1. The app side** is handled by `lib/site-url.ts`: on `VERCEL_ENV=preview` the
+callback origin comes from `VERCEL_BRANCH_URL` (stable per branch) instead of
+`NEXT_PUBLIC_APP_URL`. Set `NEXT_PUBLIC_APP_URL` in Vercel for **Production
+only** — a value scoped to Preview would re-break this.
+
+**2. The Supabase side** is a one-time allowlist entry. Supabase ignores an
+`emailRedirectTo` that isn't allowlisted and silently falls back to Site URL
+(production) — which looks exactly like the app being wrong. In **Auth → URL
+Configuration → Redirect URLs**, add:
+
+```
+https://gather-photo-*-mrkalejaiyes-projects.vercel.app/**
+```
+
+That one wildcard covers both branch URLs (`gather-photo-git-<branch>-…`) and
+per-deploy URLs (`gather-photo-<hash>-…`). Leave **Site URL** as production.
+
+**Guest flow needs none of this.** `/e/{slug}` is no-login by design, so a guest
+page on a preview is testable the moment the deploy is green:
+`https://<preview-host>/e/<slug>`.
+
+**If the preview won't load on your phone at all**, check Vercel → Project →
+Settings → Deployment Protection. With Vercel Authentication on for previews,
+the URL demands a Vercel login that a guest device won't have.

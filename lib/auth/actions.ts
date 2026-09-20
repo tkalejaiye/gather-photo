@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { siteUrl } from "@/lib/site-url";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -14,9 +15,15 @@ const EMAIL_RE = /\S+@\S+\.\S+/;
 
 // Land magic links / OAuth on our callback so the PKCE code can be exchanged
 // for a session (app/auth/callback/route.ts).
+//
+// The origin comes from `siteUrl()`, not straight from NEXT_PUBLIC_APP_URL: on
+// a preview deployment this has to be the preview's own origin, or the emailed
+// link drops you on production and the deploy can't be tested past /sign-in.
+// PKCE also requires it — the code verifier is a cookie on the origin that
+// STARTED the sign-in, so a link that lands on a different origin cannot
+// complete the exchange even if you're looking at the right page.
 function callbackUrl(): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${appUrl}/auth/callback?next=/dashboard`;
+  return `${siteUrl()}/auth/callback?next=/dashboard`;
 }
 
 export async function requestMagicLink(

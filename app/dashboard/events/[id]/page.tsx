@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import QRCode from "qrcode";
 import { createClient } from "@/lib/supabase/server";
+import { guestBaseUrl } from "@/lib/site-url";
 import { backButtonClasses } from "@/components/ui/back-button";
 import { daylightButtonClasses } from "@/components/ui/button";
 import { cx } from "@/components/ui/cx";
@@ -63,15 +64,12 @@ export default async function EventDetailPage({
     fetchUploaderSummary(supabase, event.id),
   ]);
 
-  // Fail loud if a prod deploy forgot to set this — a localhost QR on a
-  // wedding card is a much worse outcome than a 500.
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!appUrl) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("NEXT_PUBLIC_APP_URL must be set in production.");
-    }
-  }
-  const guestUrl = `${appUrl ?? "http://localhost:3000"}/e/${event.slug}`;
+  // Fails loud if a prod deploy forgot to set NEXT_PUBLIC_APP_URL — a
+  // localhost QR on a wedding card is a much worse outcome than a 500. On a
+  // preview deploy this resolves to the preview's own origin, so the QR you
+  // scan from a preview dashboard takes you to that preview's guest page and
+  // not to production (lib/site-url.ts).
+  const guestUrl = `${guestBaseUrl()}/e/${event.slug}`;
   const guestUrlDisplay = guestUrl.replace(/^https?:\/\//, "");
   // Server-rendered QR keeps the host bundle free of the qrcode package.
   // Error-correction M = ~15% damage tolerance — enough for print at A6.

@@ -14,6 +14,7 @@
     "verify:supabase": "node --env-file=.env.local scripts/verify-supabase.mjs",
     "verify:fri17": "node --env-file=.env.local scripts/verify-fri17-cross-host.mjs",
     "verify:fri18": "node --env-file=.env.local --expose-gc scripts/verify-fri18-download-memory.mjs",
+    "verify:fri21": "node scripts/verify-fri21-offline.mjs",
     "seed:gallery": "node --env-file=.env.local scripts/seed-gallery.mjs"
   },
   "dependencies": {
